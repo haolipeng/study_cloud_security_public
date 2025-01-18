@@ -1,6 +1,4 @@
-每天确定一个小目标，去不断的实现它。
-
-以什么样的主线来阅读这份代码，是我一直要进行推敲的。
+每天确定一个小目标，言出必行的去一点点实现它。
 
 # 一、parse_skb函数概览
 
@@ -8,7 +6,16 @@
 
 ## 1、1 函数参数
 
+```
+static __always_inline int parse_skb(
+    void* ctx,                  // BPF 程序上下文
+    struct sk_buff *skb,        // 网络数据包缓冲区
+    bool sk_not_ready,          // socket是否未就绪
+    enum step_t step           // 当前处理阶段(DEV_IN/TCP_IN等)
+)
+```
 
+parse_skb函数代码的全貌如下：
 
 ```
 static __always_inline int parse_skb(void* ctx, struct sk_buff *skb, bool sk_not_ready, enum step_t step) {
@@ -192,10 +199,6 @@ TODO：这里需要画图了。
 
 skb数据包的解析逻辑都在parse_skb()函数中。
 
-```
-
-```
-
 ## 2、1 获取skb中各协议头的偏移量
 
 想获取skb中各协议头的偏移量，首先我们查看下相关结构体：
@@ -263,7 +266,7 @@ BPF_CORE_READ_INTO(dst, src, field)
 
 **src参数:** src 是源对象，通常是一个结构体指针。在网络编程中最常见的是 struct sk_buff *skb，也可以是其他结构体指针如 sock、tcp_sock 等。
 
-**field参数：**field 是要读取的字段名，它必须是源对象结构体中实际存在的字段，可以是基本类型或指针类型，例如 head、mac_header、len 等。
+**field参数：**  field 是要读取的字段名，它必须是源对象结构体中实际存在的字段，可以是基本类型或指针类型，例如 head、mac_header、len 等。
 
 这个宏会安全地从 src->field 读取数据，并将结果存储到 dst 指向的内存位置。
 

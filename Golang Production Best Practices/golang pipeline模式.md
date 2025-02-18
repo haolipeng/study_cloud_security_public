@@ -764,6 +764,12 @@ func (m *ProcessorManager) Run(ctx context.Context) {
 
 # 五、参考文档
 
+上述代码示例在我的github上
+
+https://github.com/haolipeng/go_study/tree/master/go-design-patterns/pipeline
+
+
+
 https://zhuanlan.zhihu.com/p/598761593
 
 https://github.com/google/go-pipeline.git

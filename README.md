@@ -1,2 +1,34 @@
-# study_cloud_security_public
-Network security study notes
+# Cloud Security Study
+
+本仓库收集了关于云安全、网络安全、Golang 实践以及 AI 辅助编程相关的学习资料和实践笔记。
+
+## 目录
+
+### 1. 网络安全
+- [netcap](./3-网络安全/netcap/) - 网络流量分析相关研究
+
+### 2. Golang 生产环境最佳实践
+- [Golang Pipeline 模式](./Golang生产环境最佳实践/golang%20pipeline模式.md) - 详细介绍 Golang 中的 Pipeline 设计模式
+
+### 3. eBPF 学习
+- [kyanos parse_skb 函数流程解析](./ebpf学习/kyanos%20parse_skb函数流程解析.md) - 深入分析 eBPF 中的 parse_skb 函数实现
+
+### 4. AI 辅助编程实战
+- [AI 学习大纲](./AI辅助编程实战/AI学习大纲.md) - AI 学习路线图
+- [AI 工具的一点思考](./AI辅助编程实战/AI工具的一点思考.emmx) - 关于 AI 工具的实践思考
+- [AI 辅助编程实战 - 第三章](./AI辅助编程实战/AI辅助编程实战-第三章.md) - AI 辅助编程实践
+- [AI 辅助编程实战 - 第五章](./AI辅助编程实战/AI辅助编程实战-第五章.md) - AI 辅助编程实践
+- [AI 辅助编程实战 - 第六章](./AI辅助编程实战/AI辅助编程实战-第六章.md) - AI 辅助编程实践
+- [AI 辅助编程实战 - 第八章](./AI辅助编程实战/AI辅助编程实战-第八章.md) - AI 辅助编程实践
+- [AI 辅助编程实战 - 第九章](./AI辅助编程实战/AI辅助编程实战-第九章.md) - AI 辅助编程实践
+- [picture](./AI辅助编程实战/picture/) - 相关图片资源
+
+## 使用说明
+
+1. 每个分类下的文档都是独立的，可以根据需要单独阅读
+2. 文档采用 Markdown 格式编写，可以使用任意 Markdown 阅读器查看
+3. 部分文档包含图片资源，请确保在查看时保持相对路径不变
+
+## 贡献
+
+欢迎提交 Pull Request 来完善和补充内容。如果您发现任何问题或有改进建议，可添加微信hao1078285863提出 Issue，欢迎网络安全同行批评指正。

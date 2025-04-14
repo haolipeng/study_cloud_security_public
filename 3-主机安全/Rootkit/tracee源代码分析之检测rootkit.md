@@ -606,7 +606,7 @@ SEC("kprobe/do_exit"):
 
 # 六、参考资料
 
-# BlackHat Arsenal 2022: Detecting Linux kernel rootkits with Aqua Tracee
+**BlackHat Arsenal 2022: Detecting Linux kernel rootkits with Aqua Tracee**
 
 https://www.youtube.com/watch?v=EATX8g3sh-0&t=702s
 
@@ -614,9 +614,21 @@ https://www.youtube.com/watch?v=EATX8g3sh-0&t=702s
 
 
 
+**Using LSM Hooks with Tracee to Overcome Gaps with Syscall Tracing**
+
+https://www.aquasec.com/blog/linux-vulnerabilitie-tracee/
+
+
+
 **Detecting Drovorub’s File Operations Hooking with Tracee**
 
 https://www.aquasec.com/blog/detect-drovorub-kernel-rootkit-attack-tracee/
+
+
+
+**eBPF: Block Linux Fileless Payload "Malware" Execution with BPF LSM**
+
+https://djalal.opendz.org/post/ebpf-block-linux-fileless-payload-execution-with-bpf-lsm/
 
 
 

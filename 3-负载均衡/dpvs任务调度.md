@@ -30,6 +30,65 @@ typedef enum dpvs_lcore_role_type {
 } dpvs_lcore_role_t;
 ```
 
+在配置文件中要如何配置上述几种角色呢？
+
+```
+worker_defs {
+	# 配置为master核心
+    <init> worker cpu0 {
+        type    master
+        cpu_id  0
+    }
+	# 配置为转发工作核心
+    <init> worker cpu1 {
+        type    slave
+        cpu_id  1
+        # 可以配置端口和队列
+        port    dpdk0 {
+            rx_queue_ids     0
+            tx_queue_ids     0
+            ! isol_rx_cpu_ids  9
+            ! isol_rxq_ring_sz 1048576
+        }
+        port    dpdk1 {
+            rx_queue_ids     0
+            tx_queue_ids     0
+            ! isol_rx_cpu_ids  9
+            ! isol_rxq_ring_sz 1048576
+        }
+    }
+
+    <init> worker cpu2 {
+        type    slave
+        cpu_id  2
+        port    dpdk0 {
+            rx_queue_ids     1
+            tx_queue_ids     1
+            ! isol_rx_cpu_ids  10
+            ! isol_rxq_ring_sz 1048576
+        }
+        port    dpdk1 {
+            rx_queue_ids     1
+            tx_queue_ids     1
+            ! isol_rx_cpu_ids  10
+            ! isol_rxq_ring_sz 1048576
+        }
+    }
+    !<init> worker   cpu17 {
+    !    type        kni # 配置为KNI工作核心
+    !    cpu_id      17
+    !    port        dpdk0 {
+    !        rx_queue_ids     8
+    !        tx_queue_ids     8
+    !    }
+    !    port        dpdk1 {
+    !        rx_queue_ids     8
+    !        tx_queue_ids     8
+    !    }
+    !}
+}
+```
+
 
 
 ## 1、2 任务类型
@@ -44,6 +103,28 @@ typedef enum dpvs_lcore_job_type {
     LCORE_JOB_TYPE_MAX//任务类型的最大值，用于边界检查
 } dpvs_lcore_job_t;
 ```
+
+任务是分为两种的一种是每次循环都需要走的任务，比如抓包、解析、合并、
+
+
+
+## 1、3 代码剖析
+
+根据源代码来继续梳理下相关的逻辑
+
+在netif.c的config_lcores函数中对于角色的赋值如下：
+
+```
+lcore_conf[id].id = worker_min->cpu_id;
+        if (!strncmp(worker_min->type, "slave", sizeof("slave")))
+            lcore_conf[id].type = LCORE_ROLE_FWD_WORKER;
+        else if (!strncmp(worker_min->type, "kni", sizeof("kni")))
+            lcore_conf[id].type = LCORE_ROLE_KNI_WORKER;
+        else
+            lcore_conf[id].type = LCORE_ROLE_IDLE;
+```
+
+主要是赋值LCORE_ROLE_FWD_WORKER和LCORE_ROLE_KNI_WORKER这两个角色，
 
 
 
@@ -93,7 +174,7 @@ static int dpvs_job_loop(void *arg)
 {
     struct dpvs_lcore_job *job;
     lcoreid_t cid = rte_lcore_id();
-    dpvs_lcore_role_t role = g_lcore_role[cid];
+    dpvs_lcore_role_t role = g_lcore_role[cid];//如何判断逻辑核心对应的是什么角色呢？
     this_poll_tick = 0;
 
     /* skip irrelative job loops */
@@ -129,6 +210,10 @@ static int dpvs_job_loop(void *arg)
     return EDPVS_OK;
 }
 ```
+
+如何判断逻辑核心对应的是什么角色呢？
+
+
 
 
 

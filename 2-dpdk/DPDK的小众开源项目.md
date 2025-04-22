@@ -18,6 +18,8 @@ https://mp.weixin.qq.com/s/JfcIVe91OsnPjk2b5j_u4w
 
 # 二、dpvs基于dpdk的负载均衡
 
+需要尽快吃透里面的所有代码。
+
 
 
 # 三、qnsm

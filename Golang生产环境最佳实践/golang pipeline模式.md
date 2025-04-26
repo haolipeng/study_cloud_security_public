@@ -14,11 +14,55 @@
 
 - **2.处理阶段(Stage)**
 
-多个组合，每个stage可能存在多个并发处理(Processor)
+多个组合，每个stage可能存在多个并发处理器(Processor)
 
 - **3.输出(Sink)**
 
 可指定不同的输出位置(命令行/日志/kakfa队列等) 也称为消费者
+
+
+
+## 1、2 常见使用场景
+
+![Golang pipeline](https://www.druva.com/adobe/dynamicmedia/deliver/dm-aid--771d4fef-ee2a-4129-9120-5dae89c66299/blog-image1-2.png?preferwebp=true&quality=85)
+
+所有的stage都在同一个go 协程中运行。
+
+![Golang stages](https://www.druva.com/adobe/dynamicmedia/deliver/dm-aid--dab9cfd7-d1b6-4974-98f1-f53c8dd39b38/blog-image2-1.png?preferwebp=true&quality=85)
+
+为了增加处理效率，可能会多个协程来处理数据，每个协程中都包含一个pipeline，pipeline中包含完整的Input,Stage1,Stage2,Stage3,Stage4,Output。
+
+如果我们能让每个阶段都有多个实例，并且这些实例能够独立运行且相互协作，会怎么样？
+
+![Simultaneous stage interaction](https://www.druva.com/adobe/dynamicmedia/deliver/dm-aid--e2fdd1eb-8b91-452f-935c-87bc327ef08c/blog-image3.png?preferwebp=true&quality=85)
+
+
+
+传统模式： 一个人从头到尾负责一份面 
+
+**烧水->下面->煮面->调味** 
+
+新模式： 专人专岗，每道工序都有专门的人 
+
+- 烧水师傅专门负责烧水
+- 下面师傅专门负责下面
+- 煮面师傅专门负责煮面
+- 调味师傅专门负责调味
+
+好处：
+
+- 提升并行度，多个阶段的任务各不相同，可同时处理；
+
+- 每个阶段无需等待整个流程完毕，就可以开始下一轮任务；
+
+- 避免资源空闲，提升资源利用率
+- 能够对各个阶段进行独立的扩展、配置和执行
+
+
+
+参考链接：
+
+https://www.druva.com/blog/concurrent-and-efficient-pipelines-using-golang-channels
 
 
 
@@ -27,11 +71,13 @@
 根据不同的任务类型分为两种pipeline：
 
 - **同步pipeline**
-  - 场景：多个stage阶段必须在同一个协程中有序进行，前一个stage阶段处理器的处理结果直接传递给下一个stage阶段的处理器
+  - 场景：多个stage阶段必须在**同一个协程中有序进行**，前一个stage阶段处理器的输出结果，是作为输入参数传递给下一个stage阶段的处理器的
 - **异步pipeline**
   - 多个stage阶段可以在不同协程中并行执行，互不阻塞；
   - 前一个stage的结果通过channel异步传递给下一个stage；
-  - stage间处理速度不一致时，需要解耦
+  - stage间处理速度不一致时，需要进行解耦
+
+
 
 对于异步pipeline中处理速度不一致时的情况，举个例子：
 
@@ -62,7 +108,7 @@
 
 对输入的文章，如下处理
 
-1. 按行分割后按照空格分割（对应处理器1）
+1. 按行分割后按照空格分割成每个单词（对应处理器1）
 2. 统计每个单词出现的次数（对应处理器2）
 3. 按照次数排序（对应处理器3）
 4. 输出出现次数最多的前三单词（对应Sink）
@@ -299,7 +345,7 @@ func (p *SortProcessor) Process(ctx context.Context, params any) (any, error) {
 
 ![img](https://gitee.com/codergeek/picgo-image/raw/master/image/202502181012203.png)
 
-上述所有流程都在一个golang goroutine中依次执行。
+上述所有流程都在一个golang goroutine协程中依次执行。
 
 ```
 // Run 执行整个处理管道，包含数据源读取、处理器链处理、数据落地三个阶段
@@ -406,11 +452,24 @@ func (pm *ProcessorManager) RunN(ctx context.Context, maxCnt int) error {
 
 ## 3、2 高阶函数封装
 
+这块还是要好好处理的。
+
 
 
 # 四、异步pipeline最佳实践
 
 ## 4、0 异步pipeline背景
+
+一个典型的计算任务需求如下图，输入一串数字，先分别计算平方然后计算累加值
+
+1. 生成数据源，投递到channel通道中；
+2. 从channel通道中取出数据，计算平方后，投递到下一个channel通道中；
+3. 从channel通道中取出数据，计算累加值，然后投递到下一个channel通道中；
+4. 输出Sink从channel通道中读取数据，然后进行输出。
+
+
+
+**同步pipeline vs 异步pipeline 的不同点是什么？**
 
 不同于同步pipeline，异步pipeline输入输出和各个Stage算子之间的数据传输都是通过channel，每个stage都可以独立控制自己的并发度。
 
@@ -460,22 +519,7 @@ func (t *TimerSource) Process(ctx context.Context, wg *sync.WaitGroup, errChan c
 			case <-time.After(1 * time.Second):
 				s := t.Nums[i]
 				i++
-				
-				// 检查数据有效性
-				if s < 0 {
-					errChan <- errors.New("Invalid Num")
-					continue
-				}
-
-				select {
-				case outChannel <- s:
-					// 数据发送成功
-				case <-ctx.Done():
-					// 收到取消信号，但仍要确保当前数据发送出去
-					log.Println("Timer source received cancel signal, sending last data")
-					outChannel <- s
-					return
-				}
+				outChannel <- s					// 数据发送成功
 
 			case <-ctx.Done():
 				log.Println("Timer source received cancel signal")
@@ -491,7 +535,7 @@ func (t *TimerSource) Process(ctx context.Context, wg *sync.WaitGroup, errChan c
 
 
 
-### **3）输出接口**
+### **3）输出的接口**
 
 ```
 type ISink interface {
@@ -501,7 +545,7 @@ type ISink interface {
 
 
 
-### 4）输出源的实现代码
+### 4）输出Sink的实现代码
 
 ```
 // ConsoleSink 控制台输出接收器
@@ -513,7 +557,7 @@ func NewConsoleSink() *ConsoleSink {
 	return &ConsoleSink{}
 }
 
-// Process 实现接收器接口
+// Process 实现输出器接口
 // 从输入通道读取数据并打印到控制台
 // 当输入通道关闭或收到取消信号时退出
 func (s *ConsoleSink) Process(ctx context.Context, wg *sync.WaitGroup, dataChan <-chan int, errChan chan error) {
@@ -531,7 +575,7 @@ func (s *ConsoleSink) Process(ctx context.Context, wg *sync.WaitGroup, dataChan 
 				fmt.Printf("sink value: %v\n", val)
 
 			case <-ctx.Done():
-				// 继续处理输入通道中的剩余数据
+				// 继续处理通道中的剩余数据
 				log.Println("Sink draining remaining data")
 				for val := range dataChan {
 					fmt.Printf("sink value (draining): %v\n", val)
@@ -585,15 +629,7 @@ func (s *SqProcessor) Process(ctx context.Context, wg *sync.WaitGroup, dataChan 
 				}
 				// 处理数据并确保发送成功
 				result := s * s
-				select {
-				case outChannel <- result:
-					// 数据发送成功
-				case <-ctx.Done():
-					// 收到取消信号，但仍要确保当前数据发送出去
-					log.Println("Sq processor received cancel signal, sending last data")
-					outChannel <- result
-					return
-				}
+				outChannel <- result	// 数据发送成功
 				
 			case <-ctx.Done():
 				// 继续处理输入通道中的剩余数据
@@ -635,15 +671,7 @@ func (s *SumProcessor) Process(ctx context.Context, wg *sync.WaitGroup, dataChan
 				}
 				// 处理数据并确保发送成功
 				sum += s
-				select {
-				case outChannel <- sum:
-					// 数据发送成功
-				case <-ctx.Done():
-					// 收到取消信号，但仍要确保当前数据发送出去
-					log.Println("Sum processor received cancel signal, sending last data")
-					outChannel <- sum
-					return
-				}
+				outChannel <- sum // 数据发送成功
 
 			case <-ctx.Done():
 				// 继续处理输入通道中的剩余数据
@@ -701,8 +729,8 @@ func (p *ErrorPolicyExit) Process(ctx context.Context, wg *sync.WaitGroup, errCh
 type ProcessorManager struct {
 	source  ISource
 	sink    ISink
-	err     IError
 	ps      []IProcessor
+	err     IError
 	errChan chan error
 }
 
@@ -740,6 +768,7 @@ func (m *ProcessorManager) Run(ctx context.Context) {
 	wg.Add(1)
 	dataChan := m.source.Process(ctx, &wg, m.errChan)
 
+	//遍历所有注册的处理器，为每个处理器的函数执行开启一个协程
 	for _, v := range m.ps {
 		wg.Add(1)
 		dataChan = v.Process(ctx, &wg, dataChan, m.errChan)
@@ -755,7 +784,7 @@ func (m *ProcessorManager) Run(ctx context.Context) {
 	}()
 
 	// 错误通道内部逻辑是for循环，阻塞，错误处理集中处理
-	// 出现错误则通知退出，可灵活定制处理策略
+	// 出现错误则调用cancel函数通知退出，可灵活定制处理策略
 	m.err.Process(ctx, &wg, m.errChan, cancel)
 }
 ```

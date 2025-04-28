@@ -1,3 +1,9 @@
+在我的ubuntu 21.10实体机器里面使用dpdk的uio驱动绑定网卡，会遇到下面的错误
+
+Error: IOMMU support is disabled, use --noiommu-mode for binding in noiommu mode
+
+
+
 # 一、EAL初始化
 
 ```

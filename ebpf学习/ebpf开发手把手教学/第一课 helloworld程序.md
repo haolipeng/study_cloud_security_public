@@ -44,7 +44,7 @@ struct {
 	__type(value, pid_t);
 } my_pid_map SEC(".maps");
 
-//定义一个tracepoint，当进程执行exec系统调用时，触发该tracepoint
+//定义一个tracepoint，当进程执行write系统调用时，触发该tracepoint
 SEC("tp/syscalls/sys_enter_write")
 int handle_tp(void *ctx)
 {
@@ -102,7 +102,7 @@ sudo bpftrace -l 'tracepoint:syscalls:*'
 
 
 
-# 三、ebpf用户态
+# 三、ebpf用户态编码
 
 ```
 #include <stdio.h>
@@ -128,7 +128,7 @@ int main(int argc, char **argv)
 	//设置libbpf的打印函数
 	libbpf_set_print(libbpf_print_fn);
 
-	//打开BPF程序，返回对象
+	//打开BPF程序，返回skel骨架的对象
 	skel = helloworld_bpf__open();
 	if (!skel) {
 		fprintf(stderr, "Failed to open and load BPF skeleton\n");
@@ -175,6 +175,10 @@ cleanup:
 **1、包含必要的头文件**
  包含 eBPF 相关的头文件,如 `<bpf/libbpf.h>` 以及自动生成的 BPF 框架头文件,例如示例代码中的 `"helloworld.skel.h"`。
 
+比如我的用户态的文件名helloworld.c，内核态的文件名helloworld.bpf.c，那么生成的skel框架的头文件名称为helloworld.skel.h
+
+，不仅如此，包括其内部的所有api，都是和helloworld名称相关的。
+
 
 
 **2、设置 libbpf 库的配置**
@@ -192,7 +196,7 @@ cleanup:
 
 
 
-**4、附加 BPF 程序**
+**4、附加 BPF 程序到某个挂载点**
  调用 `<object>_bpf__attach(skel)` 函数将 BPF 程序附加到指定的事件源上,如 kprobe、uprobe、tracepoint 等。示例代码中使用 `helloworld_bpf__attach(skel)` 将 BPF 程序附加到 tracepoint 上。
 
 
@@ -227,8 +231,6 @@ cleanup:
 
 编译成功后，在src目录会生成名为helloworld的可执行程序
 
-![image-20250502175245975](./picture/202505021752850.png)
-
 ## 4、2 运行结果
 
 在src目录下运行程序后，可以看到程序运行正常。
@@ -243,11 +245,15 @@ cleanup:
 
 在哪里查看ebpf程序的输出结果呢？
 
-在
-
 
 
 # 五、相关资料
+
+开箱即用的虚拟机
+
+或者容器环境。
+
+
 
 项目源代码地址：
 

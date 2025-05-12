@@ -1,4 +1,57 @@
-# 一、流管理概述
+# 一、相关
+
+## 1、1 Flow结构体
+
+相关代码结构在flow.h文件中，里面的成员变量很多，这里就不一一表明了。
+
+
+
+## 1、2 Flow Hash Table 会话哈希表
+
+![image-20250512144139348](./picture/image-20250512144139348.png)
+
+流存储在全局哈希表（flow_hash）中，以便通过 5 元组信息进行有效查找：
+
+flow_hash是一个链表，其中的每个元素都是一个FlowBucket，每个FlowBucket链表中存储着多个Flow流。
+
+![image-20250512151923742](https://gitee.com/codergeek/picgo-image/raw/master/image/202505121519006.png)
+
+next_ts字段：用于优化超时扫描的原子变量。
+
+
+
+## 1、3 FlowQueue队列
+
+![image-20250512153713581](https://gitee.com/codergeek/picgo-image/raw/master/image/202505121537970.png)
+
+具体代码如下：
+
+```
+typedef struct FlowQueuePrivate_
+{
+    Flow *top;
+    Flow *bot;
+    uint32_t len;
+} FlowQueuePrivate;
+
+/* Define a queue for storing flows */
+typedef struct FlowQueue_
+{
+    FlowQueuePrivate priv;
+    SC_ATOMIC_DECLARE(bool,non_empty);
+    SCMutex m;
+} FlowQueue;
+```
+
+核心的队列包括：
+
+**flow_recycle_q**: 用于从哈希表中回收flow；
+
+**spare_queue**:适用于可回收、可复用的flow结构；
+
+**work_queue**: 需要进一步处理的流；
+
+
 
 流管理包括以下几个部分：
 
@@ -24,17 +77,11 @@
 
 
 
-状态机的部分，我会单独开篇文章来表述下suricata是如何实现状态机的。
-
-
-
 流管理使用独立的线程，包括老化线程和回收线程，可以启动多个线程，但默认启动一个线程。
 
  老化线程：main-》SuricataMain-》RunModeDispatch-》FlowManagerThreadSpawn
 
  回收线程：main-》SuricataMain-》RunModeDispatch-》FlowRecyclerThreadSpawn
-
-
 
 
 
@@ -163,16 +210,18 @@ void FlowInitConfig(char quiet)
 
 ### 3、2、1 FlowSparePoolInit函数
 
-FlowSparePoolInit函数如下所示：
+FlowSparePoolInit函数负责初始化Suricata的流量处理预分配内存池（Flow Spare Pool）。
+
+这个内存池是一种性能优化机制，通过预先分配一定数量的Flow对象，减少在高负载场景下的动态内存分配和释放带来的性能开销，从而提高网络流量处理效率。
 
 ```
 //初始化全局内存池
 void FlowSparePoolInit(void)
 {
     SCMutexLock(&flow_spare_pool_m);//加锁
-    //预先申请内存数
+    //预先申请内存数（flow_config.prealloc）
     for (uint32_t cnt = 0; cnt < flow_config.prealloc; ) {
-        FlowSparePool *p = FlowSpareGetPool();//简单malloc一个FlowSparePool
+        FlowSparePool *p = FlowSpareGetPool();//简单malloc一个FlowSparePool结构体内存空间
         FlowSparePoolUpdateBlock(p);//重要函数！！！
         cnt += p->queue.len;
 
@@ -203,13 +252,25 @@ static FlowSparePool *FlowSpareGetPool(void)
 
 
 
-FlowSparePool结构体的定义如下：
+**FlowSparePool结构体的定义如下：**
 
 ```
 typedef struct FlowSparePool {
-    FlowQueuePrivate queue;//flow队列，由100个flow组成
-    struct FlowSparePool *next;//next指针，用于将多个flow队列组成链表
+    FlowQueuePrivate queue;//存储预分配Flow对象的队列
+    struct FlowSparePool *next;//指向下一个FlowSparePool的指针，形成链表
 } FlowSparePool;
+```
+
+
+
+**FlowQueuePrivate结构体的定义如下：**
+
+```
+typedef struct FlowQueuePrivate_ {
+    Flow *top;      // 队列头指针
+    Flow *bot;      // 队列尾指针
+    uint32_t len;   // 队列中元素数量
+} FlowQueuePrivate;
 ```
 
 
@@ -257,6 +318,8 @@ Flow *FlowAlloc(void)
 }
 ```
 
+分配单个Flow对象的内存，同时考虑内存上限控制。
+
 
 
 **3、最后FlowQueuePrivateAppendFlow函数，将Flow结构体实例添加到全局内存池的flow queue中。**
@@ -277,6 +340,8 @@ void FlowQueuePrivateAppendFlow(FlowQueuePrivate *fqc, Flow *f)
     f->next = NULL;
 }
 ```
+
+FlowQueuePrivateAppendFlow函数的代码逻辑就是很寻常的链表操作的逻辑了。
 
 
 
@@ -319,4 +384,4 @@ void FlowInitFlowProto(void)
 
 
 
-suricata相关的测试用例，是如何进行编写的？这块还需要好好看下。
+suricata流初始化相关的测试用例，在什么文件中呢？

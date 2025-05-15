@@ -1,6 +1,10 @@
 上文讲到流表的初始化，这节我们开始流建立。
 
+
+
 # 一、流建立概述
+
+![image-20250512162712011](./picture/image-20250512162712011.png)
 
  流表建立要从FlowWorker函数说起，在解码模块中已经调用函数FlowSetupPacket根据五元组设置了流的hash值p->flow_hash，并且设置了标志位PKT_WANTS_FLOW，表示这个是由网络收包经过解码模块而来的真正的packet数据包
 
@@ -65,9 +69,9 @@ FlowSetupPacket设置数据包标记为PKT_WANTS_FLOW。
 
 
 
-## 1、2 解码模块和FlowWorker如何传递Packet
+## 1、2 Decoder解码模块和FlowWorker如何传递Packet
 
-不管是single模式、workers模式，都是将模块注册到线程中，然后在线程函数中以for循环的方式执行不同的模块回调函数，所以并不存在在不同模块间传递Packet数据包的情况。
+不管是single模式、workers模式，都是将模块注册到线程中，然后在线程函数中以for循环的方式循环调用“不同模块”的回调函数，所以并不存在在不同模块间传递Packet数据包的情况。
 
 
 
@@ -100,7 +104,25 @@ typedef struct FlowLookupStruct_
 
 
 
-## 2、2 流程分析
+## 2、2 流处理的流程分析
+
+流处理的处理流程：
+
+![image-20250512162353698](./picture/image-20250512162353698.png)
+
+FlowWorker -> FlowHandlePacket -> FlowGetFlowFromHash -> Flow Bucket
+
+流处理涉及到：
+
+1、根据数据包的五元组计算哈希值
+
+2、查找对应的FlowBucket
+
+3、将Flow流和数据包进行比较
+
+4、如果找不到流，则创建一个新的Flow流
+
+
 
 流处理模块是FlowWorker函数来负责的。
 
@@ -139,7 +161,9 @@ void FlowHandlePacket(ThreadVars *tv, FlowLookupStruct *fls, Packet *p)
 }
 ```
 
-FlowGetFlowFromHash函数：通过哈希值查找对应的flow流，并设置数据包标志为PKT_HAS_FLOW，方便后续流程处理。
+**FlowGetFlowFromHash函数作用：**
+
+通过哈希值查找对应的flow流，并设置数据包标志为PKT_HAS_FLOW，方便后续流程处理。
 
 
 

@@ -135,9 +135,15 @@ cmake --install build --prefix /tmp/example
 
 
 
+在protocol目录新建一个独立的CMakeLists.txt文件来管理所有协议插件的解析，如何？
 
+- **职责分离** - 根目录CMakeLists.txt文件专注整体架构，protocol目录CMakeLists.txt文件专注插件管理
+- **模块化设计** - 每个目录有独立的构建逻辑
+- **可维护性** - 插件相关配置集中在一处，便于维护
+- **可扩展性** - 添加新插件只需修改protocol层配置
+- **减少根目录复杂度** - 根CMakeLists.txt更简洁清晰
 
-
+现在对加密流量探针项目的完善
 
 
 

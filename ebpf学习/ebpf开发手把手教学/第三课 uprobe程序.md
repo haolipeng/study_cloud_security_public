@@ -2,11 +2,17 @@
 
 # 一、什么是uprobe？urpobe能干什么？
 
-
+kprobes机制在事件的基础上为内核态提供了追踪的功能，而uprobes则为用户态提供了追踪调试的功能。
 
 
 
 # 二、libbpf示例程序
+
+**概述**
+
+例子中的程序将uprobe和uretprobe的BPF程序绑定到它自己的函数，并使用bpf_printk宏记录函数的输入参数和返回值。用户空间函数每秒触发一次：
+
+
 
 ## 2、1 内核态程序剖析剖析
 
@@ -48,21 +54,35 @@ int BPF_KRETPROBE(uretprobe_sub, int ret)
 }
 ```
 
+在这个示例中，用户态进程自己探测自己（这个例子举的不太好，实际情况是探测其他进程），进程自己探测自己，所以可以使用/proc/self/exe，后者这个文件是指向访问这个文件的进程本身的符号链接。
+
 
 
 ```c
 SEC("uretprobe")
 ```
 
-和
+这种没指定目标函数。由用户态bpf程序加载和动态绑定到探测目标函数。
+
+上层用户态bpf程序需要自行计算函数在ELF文件中的偏移量。
+
+
 
 ```c
 SEC("uprobe//proc/self/exe:uprobed_sub")
 ```
 
+这种指定了目标elf路径和函数。可由用户态libbpf自动加载和绑定到探测目标函数。
+
+上层用户态bpf程序不需要计算函数在ELF文件中的偏移量offset。由libbpf自动计算。
+
+
+
+
+
 两种方式的区别是什么呢？
 
-
+一个指明了具体的路径，一个是需要自己来计算偏移量的。
 
 
 
@@ -110,14 +130,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	/* Attach tracepoint handler */
+	//uprobe/uretprobe 需要指定要附加到的目标函数的相对偏移量。
+	//如果我们提供函数名，libbpf 将自动为我们计算偏移量。
+	//如果没有指定函数名，libbpf 将尝试使用函数偏移量。
 	uprobe_opts.func_name = "uprobed_add";
 	uprobe_opts.retprobe = false;
-	/* uprobe/uretprobe expects relative offset of the function to attach
-	 * to. libbpf will automatically find the offset for us if we provide the
-	 * function name. If the function name is not specified, libbpf will try
-	 * to use the function offset instead.
-	 */
 	skel->links.uprobe_add = bpf_program__attach_uprobe_opts(skel->progs.uprobe_add,
 								 0 /* self pid */, "/proc/self/exe",
 								 0 /* offset for function */,
@@ -170,3 +187,9 @@ cleanup:
 ```
 
 上述代码实现了uprobed_add和uprobed_sub函数，分别是加法和减法。
+
+
+
+bpf_program__attach_uprobe_opts这个是不需要计算偏移量了吗？
+
+# 三、编写uprobe代码跟踪c语言程序

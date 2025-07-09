@@ -173,3 +173,78 @@ int netif_port_register(struct netif_port *port)
 
 
 
+# 二、程序启动命令行参数
+
+## 1、DPDK EAL命令行参数(-l 0-3 -n 4)
+
+作用：告诉dpdk在哪些物理CPU核心上运行
+
+范围：指定系统物理CPU核心的范围
+
+
+
+## 2、配置文件的worker_defs
+
+作用：定义程序内部工作线程的逻辑ID和功能分配
+
+范围：程序内部的工作线程编号和队列分配
+
+示例：cpu_id 0表示NetDedender的第0个工作线程
+
+**重要说明：**cpu_id只是NetDedender内部的工作线程标识符，**不直接对应物理CPU核心**。
+
+
+
+简单映射关系
+
+```
+# 命令行：使用系统 CPU 0-3
+./dpvs -- -l 0-3
+
+# 配置文件：DPVS 工作线程 0-3
+worker_defs {
+    worker cpu0 { cpu_id 0 }  # 映射到系统 CPU 0
+    worker cpu1 { cpu_id 1 }  # 映射到系统 CPU 1
+    worker cpu2 { cpu_id 2 }  # 映射到系统 CPU 2
+    worker cpu3 { cpu_id 3 }  # 映射到系统 CPU 3
+}
+```
+
+
+
+复杂映射关系
+
+```
+# 命令行：指定映射关系
+./dpvs -- --lcores 0@1,1@2,2@3,3@4
+
+# 配置文件：DPVS 工作线程配置
+worker_defs {
+    worker cpu0 { cpu_id 0 }  # 映射到系统 CPU 1
+    worker cpu1 { cpu_id 1 }  # 映射到系统 CPU 2
+    worker cpu2 { cpu_id 2 }  # 映射到系统 CPU 3
+    worker cpu3 { cpu_id 3 }  # 映射到系统 CPU 4
+}
+```
+
+
+
+### 为什么需要双重配置？
+
+#### 1. 职责分离
+
+- DPDK EAL 参数：负责底层 CPU 资源分配和隔离
+
+- DPVS 配置文件：负责应用层工作线程逻辑分配
+
+#### 2. 灵活性
+
+- 可以在不修改配置文件的情况下，通过命令行参数调整 CPU 使用
+
+- 支持复杂的 CPU 映射关系（如跳过某些 CPU 核心）
+
+#### 3. 性能优化
+
+- 可以避免使用系统繁忙的 CPU 核心（如 CPU 0）
+
+- 支持 NUMA 感知的 CPU 分配

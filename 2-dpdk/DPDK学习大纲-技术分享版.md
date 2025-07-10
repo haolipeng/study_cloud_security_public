@@ -8,6 +8,34 @@
 
 
 
+# 零、环境搭建和初体验
+
+## 1、dpdk源代码的编译
+
+需要安装一些依赖库，具体要安装的库在这里。
+
+https://doc.dpdk.org/guides/linux_gsg/sys_reqs.html#compilation-of-the-dpdk
+
+
+
+## 2、helloworld程序的解读(或手写)
+
+需要大家熟悉下以下的api函数：
+
+rte_eal_init
+
+RTE_LCORE_FOREACH_WORKER
+
+rte_eal_remote_launch
+
+https://doc.dpdk.org/api/rte__launch_8h.html#a2bf98eda211728b3dc69aa7694758c6d
+
+rte_eal_mp_wait_lcore（和rte_eal_remote_launch函数的关联是什么）
+
+rte_eal_cleanup
+
+
+
 # 一、内存管理
 
 **1、Lcore变量**

@@ -246,19 +246,100 @@ cat /proc/meminfo | grep Huge
 
 
 
-下次的课程：
-
 ## 1、4 helloworld程序的流程解读
+
+**helloworld程序编译方法**
+
+进入到example
+
+
+
+**helloworld程序运行方法**
+
+```
+root@r630-PowerEdge-R630:/home/work/dpdk-stable-24.11.1/examples/helloworld# ./build/helloworld -c 0x3
+EAL: Detected CPU lcores: 72
+EAL: Detected NUMA nodes: 2
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+hello from core 1
+hello from core 0
+```
+
+
+
+**helloworld代码剖析**
+
+```
+/* 在逻辑核心上启动一个处理函数 */
+static int
+lcore_hello(__rte_unused void *arg)
+{
+	unsigned lcore_id;
+	lcore_id = rte_lcore_id();
+	printf("hello from core %u\n", lcore_id);
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	int ret;
+	unsigned lcore_id;
+	
+	//eal初始化
+	ret = rte_eal_init(argc, argv);
+	if (ret < 0)
+		rte_panic("Cannot init EAL\n");
+
+	/* Launches the function on each lcore. 8< */
+	RTE_LCORE_FOREACH_WORKER(lcore_id) {
+		rte_eal_remote_launch(lcore_hello, NULL, lcore_id);
+	}
+
+	/* 在main核心上也调用lcore_hello 函数*/
+	lcore_hello(NULL);
+
+	rte_eal_mp_wait_lcore();
+
+	/* clean up the EAL */
+	rte_eal_cleanup();
+
+	return 0;
+}
+```
+
+lcore_hello如果通俗点理解的话，就是线程函数就行。
+
+
 
 需要大家熟悉下以下的api函数：
 
 rte_eal_init
 
-RTE_LCORE_FOREACH_WORKER
+RTE_LCORE_FOREACH_WORKER宏定义如下
+
+```
+/**
+ * Macro to browse all running lcores except the main lcore.
+ */
+#define RTE_LCORE_FOREACH_WORKER(i)					\
+	for (i = rte_get_next_lcore(-1, 1, 0);				\
+	     i < RTE_MAX_LCORE;						\
+	     i = rte_get_next_lcore(i, 1, 0))
+```
+
+
 
 rte_eal_remote_launch
 
 https://doc.dpdk.org/api/rte__launch_8h.html#a2bf98eda211728b3dc69aa7694758c6d
+
+## rte_eal_mp_remote_launch和rte_eal_remote_launch的区别
+
+
 
 rte_eal_mp_wait_lcore（和rte_eal_remote_launch函数的关联是什么）
 

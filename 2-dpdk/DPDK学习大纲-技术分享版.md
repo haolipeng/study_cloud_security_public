@@ -248,16 +248,33 @@ cat /proc/meminfo | grep Huge
 
 ## 1、4 helloworld程序的流程解读
 
-**helloworld程序编译方法**
+### 1、4、1 **程序编译方法**
 
 进入到example
 
-
-
-**helloworld程序运行方法**
+比如我的dpdk库的example目录为/home/work/dpdk-stable-24.11.1/examples/helloworld
 
 ```
-root@r630-PowerEdge-R630:/home/work/dpdk-stable-24.11.1/examples/helloworld# ./build/helloworld -c 0x3
+cd /home/work/dpdk-stable-24.11.1/examples/helloworld
+```
+
+执行make编译，编译源代码
+
+```
+root@r630-PowerEdge-R630:/home/work/dpdk-stable-24.11.1/examples/helloworld# make
+cc -O3 -I/home/work/dpdk-stable-24.11.1/dpdklib/include -include rte_config.h -march=native -mrtm  -DALLOW_EXPERIMENTAL_API main.c -o build/helloworld-shared  -Wl,--as-needed -L/home/work/dpdk-stable-24.11.1/dpdklib/lib/x86_64-linux-gnu -lrte_node -lrte_graph -lrte_pipeline -lrte_table -lrte_pdump -lrte_port -lrte_fib -lrte_pdcp -lrte_ipsec -lrte_vhost -lrte_stack -lrte_security -lrte_sched -lrte_reorder -lrte_rib -lrte_mldev -lrte_regexdev -lrte_rawdev -lrte_power -lrte_pcapng -lrte_member -lrte_lpm -lrte_latencystats -lrte_jobstats -lrte_ip_frag -lrte_gso -lrte_gro -lrte_gpudev -lrte_dispatcher -lrte_eventdev -lrte_efd -lrte_dmadev -lrte_distributor -lrte_cryptodev -lrte_compressdev -lrte_cfgfile -lrte_bpf -lrte_bitratestats -lrte_bbdev -lrte_acl -lrte_timer -lrte_hash -lrte_metrics -lrte_cmdline -lrte_pci -lrte_ethdev -lrte_meter -lrte_net -lrte_mbuf -lrte_mempool -lrte_rcu -lrte_ring -lrte_eal -lrte_telemetry -lrte_argparse -lrte_kvargs -lrte_log 
+ln -sf helloworld-shared build/helloworld
+root@r630-PowerEdge-R630:/home/work/dpdk-stable-24.11.1/examples/helloworld#
+```
+
+可执行程序生成在build文件夹下。
+
+### 1、4、2 程序运行方法
+
+程序支持很多参数，但想最简单的运行，只需要很少的命令行参数。
+
+```
+root@r630-PowerEdge-R630:/home/work/dpdk-stable-24.11.1/examples/helloworld# ./build/helloworld -c 0x3 -n 4
 EAL: Detected CPU lcores: 72
 EAL: Detected NUMA nodes: 2
 EAL: Detected shared linkage of DPDK
@@ -265,13 +282,20 @@ EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
 EAL: Selected IOVA mode 'VA'
 EAL: VFIO support initialized
 EAL: Using IOMMU type 1 (Type 1)
-hello from core 1
+hello from core 1   
 hello from core 0
 ```
 
+其中
 
+```
+hello from core 1   
+hello from core 0
+```
 
-**helloworld代码剖析**
+为程序的输出。
+
+### 1、4、3 helloworld代码剖析
 
 ```
 /* 在逻辑核心上启动一个处理函数 */
@@ -279,7 +303,7 @@ static int
 lcore_hello(__rte_unused void *arg)
 {
 	unsigned lcore_id;
-	lcore_id = rte_lcore_id();
+	lcore_id = rte_lcore_id();//获取当前函数所使用的lcore逻辑核心
 	printf("hello from core %u\n", lcore_id);
 	return 0;
 }
@@ -289,12 +313,12 @@ int main(int argc, char **argv)
 	int ret;
 	unsigned lcore_id;
 	
-	//eal初始化
+	//EAL初始化，简单理解就是环境初始化就行，刚开始学技术不用想太多，先使用起来，例子运行起来。
 	ret = rte_eal_init(argc, argv);
 	if (ret < 0)
 		rte_panic("Cannot init EAL\n");
 
-	/* Launches the function on each lcore. 8< */
+	//遍历每个worker逻辑核心，并在worker核心上运行lcore_hello函数
 	RTE_LCORE_FOREACH_WORKER(lcore_id) {
 		rte_eal_remote_launch(lcore_hello, NULL, lcore_id);
 	}
@@ -304,7 +328,7 @@ int main(int argc, char **argv)
 
 	rte_eal_mp_wait_lcore();
 
-	/* clean up the EAL */
+	/* 清理EAL资源，对应上面的EAL初始化 */
 	rte_eal_cleanup();
 
 	return 0;
@@ -313,11 +337,9 @@ int main(int argc, char **argv)
 
 lcore_hello如果通俗点理解的话，就是线程函数就行。
 
-
-
 需要大家熟悉下以下的api函数：
 
-rte_eal_init
+**1、RTE_LCORE_FOREACH_WORKER宏定义**
 
 RTE_LCORE_FOREACH_WORKER宏定义如下
 
@@ -333,17 +355,170 @@ RTE_LCORE_FOREACH_WORKER宏定义如下
 
 
 
-rte_eal_remote_launch
+**2、rte_eal_remote_launch**
+
+函数原型
+
+```
+int rte_eal_remote_launch(lcore_function_t * f,void * arg, unsigned worker_id)
+```
+
+参数f：要被调用的函数
+
+参数arg：函数的参数
+
+参数worker_id：f指定的函数将要在哪个cpu核心上执行，worker_id来进行标识
+
+返回值：
+
+- 0: 成功. 函数 f 的执行已在远程 lcore 上开始
+- (-EBUSY): 远程核心未处于WAIT状态
+- (-EPIPE): 读取或写入管道到工作线程时出错
+
+描述：
+
+rte_eal_remote_launch函数只能在main核心上被调用。
+
+发送一个消息到worker_id指定的处于WAIT状态的cpu核心，
+
+当worker_id指定的cpu核心接收到消息后，它会切换到RUNNING 状态，然后调用注册的回调函数f。
+
+一旦函数执行完成，worker_id指定的cpu核心又重新切换回WAIT状态，并且 f 的返回值存储在本地变量中，以便使用 rte_eal_wait_lcore() 来读取。
 
 https://doc.dpdk.org/api/rte__launch_8h.html#a2bf98eda211728b3dc69aa7694758c6d
 
-## rte_eal_mp_remote_launch和rte_eal_remote_launch的区别
+
+
+**3、rte_eal_mp_wait_lcore**
+
+等待所有 lcore 完成其工作。
+
+rte_eal_mp_wait_lcore函数只能在main核心上被调用。
+
+调用 rte_eal_mp_wait_lcore() 后，调用者可以假定所有工作 lcore 都处于 WAIT 状态。
 
 
 
-rte_eal_mp_wait_lcore（和rte_eal_remote_launch函数的关联是什么）
+温馨提示：虽然现在有AI辅助编程，但是程序员还是要锻炼自身阅读文档的能力，因为官网文档更新速度快，解释很清晰，能够让你掌握第一手的信息。
 
-rte_eal_cleanup
+
+
+### 1、4、4 再深入一点点
+
+**启动线程时，调用rte_eal_remote_launch**
+
+发送一个消息到worker_id指定的处于WAIT状态的cpu核心，
+
+当worker_id指定的cpu核心接收到消息后，它会切换到RUNNING 状态，然后调用注册的回调函数f。
+
+一旦函数执行完成，worker_id指定的cpu核心又重新切换回WAIT状态，并且 f 的返回值存储在本地变量中，以便使用。
+
+
+
+**等待线程结束时，调用rte_eal_mp_wait_lcore**
+
+等待所有 lcore 完成其工作。
+
+
+
+不知道小伙伴们对这句话的表述是否犯迷糊？相信我，我第一个学习时，也犯迷糊，很正常。
+
+让我们深入源代码探究下这块原理，源码面前，没有秘密。
+
+#### 1. lcore函数启动流程
+
+```
+// 在 main.c 中调用
+rte_eal_remote_launch(lcore_hello, NULL, lcore_id);
+
+// 在 eal_common_launch.c 中
+int rte_eal_remote_launch(lcore_function_t *f, void *arg, unsigned int worker_id)
+{
+    // 1. 检查 worker 是否在 WAIT 状态
+    if (rte_atomic_load_explicit(&lcore_config[worker_id].state, 
+            rte_memory_order_acquire) != WAIT)
+        goto finish;
+
+    // 2. 设置函数参数
+    lcore_config[worker_id].arg = arg;
+    
+    // 3. 设置要执行的函数指针
+    rte_atomic_store_explicit(&lcore_config[worker_id].f, f, rte_memory_order_release);
+
+    // 4. 唤醒 worker 线程
+    rc = eal_thread_wake_worker(worker_id);
+}
+```
+
+#### 2. Worker 线程唤醒机制
+
+```
+// 在 eal_unix_thread.c 中
+int eal_thread_wake_worker(unsigned int worker_id)
+{
+    // 通过管道发送唤醒信号
+    int m2w = lcore_config[worker_id].pipe_main2worker[1];
+    write(m2w, &c, 1);  // 发送一个字节唤醒 worker
+}
+```
+
+#### 3、Worker 线程主循环
+
+```
+uint32_t eal_thread_loop(void *arg)
+{
+    unsigned int lcore_id = (uintptr_t)arg;
+    
+    // 初始化线程
+    __rte_thread_init(lcore_id, &lcore_config[lcore_id].cpuset);
+    
+    // 主循环
+    while (1) {
+        lcore_function_t *f;
+        void *fct_arg;
+
+        // 1. 等待主线程的命令
+        eal_thread_wait_command();
+
+        // 2. 设置状态为 RUNNING
+        rte_atomic_store_explicit(&lcore_config[lcore_id].state, RUNNING,
+            rte_memory_order_release);
+
+        // 3. 确认命令已收到
+        eal_thread_ack_command();
+
+        // 4. 等待函数指针被设置
+        while ((f = rte_atomic_load_explicit(&lcore_config[lcore_id].f, rte_memory_order_acquire)) == NULL)
+        	//函数指针为空，则等待
+            rte_pause();
+
+        // 5. 执行函数！这里是关键
+        fct_arg = lcore_config[lcore_id].arg;
+        ret = f(fct_arg);  // <-- 你注册的回调函数f在这里执行！
+        
+        // 6. 保存返回值并清理
+        lcore_config[lcore_id].ret = ret;
+        lcore_config[lcore_id].f = NULL;
+        lcore_config[lcore_id].arg = NULL;
+
+        // 7. 设置状态为 WAIT，等待下一个任务
+        rte_atomic_store_explicit(&lcore_config[lcore_id].state, WAIT,
+            rte_memory_order_release);
+    }
+}
+```
+
+你的 lcore 函数（如 lcore_hello）是在每个 worker 线程的 eal_thread_loop 函数中执行的。每个 worker 线程都在一个无限循环中等待主线程分配任务，当收到任务时，就会调用你指定的函数。
+
+
+
+总结如下图所示：
+
+![image-20250716102831065](https://gitee.com/codergeek/picgo-image/raw/master/image/202507161028779.png)
+
+master和worker之间的通信机制如下图所示：
+
+![image-20250716105742321](https://gitee.com/codergeek/picgo-image/raw/master/image/202507161057428.png)
 
 
 

@@ -450,6 +450,8 @@ int rte_eal_remote_launch(lcore_function_t *f, void *arg, unsigned int worker_id
 }
 ```
 
+至于是如何唤醒worker线程，我们马上讲。
+
 #### 2. Worker 线程唤醒机制
 
 ```
@@ -542,37 +544,59 @@ master和worker之间的通信机制如下图所示：
 
 # 三、CPU Packet Processing数据包处理
 
-**1、Toeplitz Hash库**
+## **1、Toeplitz Hash库**
 
 https://doc.dpdk.org/guides/prog_guide/toeplitz_hash_lib.html
 
 
 
-**2、Hash库**
+## **3、2 Hash库**
+
+Use Case: Flow Classification
+
+通过阅读官网文档，我推荐新手阶段专注在使用场景上，也就是最简单的api使用即可。
+
+然后后面慢慢渗入，比如使用更精准高性能的api，或者理解透彻其中的一些原理。
 
 https://doc.dpdk.org/guides/prog_guide/hash_lib.html
 
 
 
-**3、IP分片和重组库**
+**创建哈希表：rte_hash_create**
+
+**哈希表操作(添加元素)：rte_hash_add_key**
+
+**哈希表操作(查找元素)：rte_hash_lookup**
+
+**哈希表操作(查找元素)：rte_hash_del_key**
+
+**获取哈希表中的元素个数：rte_hash_count**
+
+**遍历哈希表中元素项：rte_hash_iterate**
+
+**清空哈希表中元素项：rte_hash_reset**
+
+
+
+## **3、3 IP分片和重组库**
 
 https://doc.dpdk.org/guides/prog_guide/ip_fragment_reassembly_lib.html
 
 
 
-**4、Packet Classification And Access Control(ACL)库**
+## 3、**4 Packet Classification And Access Control(ACL)库**
 
 https://doc.dpdk.org/guides/prog_guide/packet_classif_access_ctrl.html
 
 
 
-**5、Packet 转发库**
+## **3、5 Packet 转发库**
 
 https://doc.dpdk.org/guides/prog_guide/packet_distrib_lib.html
 
 
 
-**6、Reorder库**
+## 3、**6 Reorder库**
 
 https://doc.dpdk.org/guides/prog_guide/reorder_lib.html
 

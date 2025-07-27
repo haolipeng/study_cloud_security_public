@@ -1,12 +1,26 @@
-对于软件开发领域来说，哪些大语言模型是最合适的？
-
 ## 6、5 处理乏味的任务
+
+软件开发中涵盖架构设计、编程和测试等多个环节。在这些过程中，有很多重复性的编程任务尤为让人头疼，他们不仅枯燥而且耗时。
+
+
 
 ### 6、5、1 正则表达式
 
 正则表达式由各种符号和命令组成，可能会让人觉得非常棘手。
 
+要记住所有复杂的斜杠、点、括号及其他神秘的组合，的确会让人感到困惑。
+
 1、根据需求生成正则表达式
+
+**提示：**
+
+请生成一个正则表达式以验证IPv4地址。应确保每个8位组是0和255之间的数字，并且各8位组通过点号分隔。
+
+
+
+结果：
+
+^(25[0-5]|2[0-4]\d|[0-1]?\d\d?)\.((25[0-5]|2[0-4]\d|[0-1]?\d\d?)\.){2}(25[0- 5]|2[0-4]\d|[0-1]?\d\d?)$
 
 
 
@@ -18,94 +32,16 @@ AI工具能帮助开发者从枯燥乏味的编程任务中解脱出来，做更
 
 
 
-# 第八章 编写代码
+### 6、5、2 入门代码
 
-深入挖掘函数和类的潜力；
-
-代码重构：将杂乱无章的代码，重构为流畅、高效的代码结构；
-
-自动生成前端界面的AI工具
+对于编程初学者，研究和探索入门代码有助于理解编程概念和工作机制。
 
 
 
+### 6、5、3 README文件
+
+​	通过这个文件，你可以快速了解项目的核心内容：项目的用途、工作原理以及如何使用项目。README文件通常命名为README.md，使用Markdown格式编写，以确保文件既美观又易于阅读。
+
+​	编写一个好的README文件确实需要一定的写作技巧，而这并不是开发者的强项。随着项目的不断发展和变化，保持README文件不断更新也是一个挑战，这就是所谓的“既要……又要……”的情况。
 
 
-想通过当前 AI 工具学习编程的人应该设定两个目标：
-
-一是学会足够的编程知识以理解工具生成的内容；
-
-二是扮演‘代码审核员’的角色，学会识别和改进劣质代码。
-
-如何识别劣质代码呢？
-
-
-
-首先，使用AI工具生成项目文件结构，
-
-先总体使用AI工具将项目的轮廓大致构建出来，然后再深入到代码区一点点去完善每个模块和细节。
-
-
-
-# 8、8 重构
-
-8、8、1 忍者代码
-
-
-
-https://baoyu.io/translations/ai/if-you-use-ai-to-teach-you-how-to-code-remember-you-still-need-to-think-for-yourself
-
-
-
-## 8、10 面向对象编程
-
-帮助开发者设计类的初始结构。以下是一些设计类的提示范例：
-
-```
-使用C++语言，设计一个包含员工姓名(employeeName)、员工ID(employeeID)和部门等属性的Employee类。请实现一个方法来显示员工的详细信息，并包含一个构造函数来初始化这些属性。
-```
-
-AI工具生成的代码内容如下：
-
-```
-#include <iostream>
-#include <string>
-using namespace std;
-
-class Employee {
-private:
-    string m_employeeName;  // 员工姓名
-    int m_employeeID;       // 员工ID
-    string m_department;    // 部门名称
-
-public:
-    // 构造函数，用于初始化成员变量
-    Employee(const string& name, int id, const string& dept)
-        : m_employeeName(name), m_employeeID(id), m_department(dept) {}
-
-    // 方法：显示员工详细信息
-    void displayDetails() const {
-        cout << "Employee Details:" << endl;
-        cout << "Name: " << m_employeeName << endl;  // 使用 m_ 命名成员变量
-        cout << "ID: " << m_employeeID << endl;
-        cout << "Department: " << m_department << endl;
-    }
-};
-
-int main() {
-    // 创建 Employee 对象并初始化
-    Employee emp("John Doe", 1001, "Human Resources");
-
-    // 显示员工详细信息
-    emp.displayDetails();
-
-    return 0;
-}
-```
-
-## 8、11 框架和库
-
-框架和库如果更新比较频繁的话，那么当AI工具的训练数据集并没有那么新时，可能会导致一些问题。
-
-
-
-## 8、12 生成样本数据

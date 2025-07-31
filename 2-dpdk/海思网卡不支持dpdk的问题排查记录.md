@@ -2,7 +2,7 @@
 
 客户现场的服务器的网卡是海思的网卡，但是在dpdk初始化时报错，
 
-![image-20250731102320337](https://gitee.com/codergeek/picgo-image/raw/master/image/202507311023745.png)
+![image-20250731102320337](./picture/image-20250731102320337.png)
 
 首先梳理下报错堆栈如下
 

@@ -182,6 +182,12 @@ Hash(SrcIP, DstIP, SrcPort, DstPort) = Hash(DstIP, SrcIP, DstPort, SrcPort)
 
 
 
+Intel X710网卡是否支持对称哈希呢？
+
+如果我想采用对称哈希，那么我应该如何在编写代码时进行配置呢？
+
+
+
 
 
 参考链接：

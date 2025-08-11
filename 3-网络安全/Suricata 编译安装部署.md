@@ -257,6 +257,16 @@ suricata -u -U StreamTcpTest14
 
 
 
+**-u：**运行单元测试程序然后退出。
+
+**-U，--unittest-filter=REGEX**  使用-U选项，您可以选择要运行哪个单元测试。此选项使用正则表达式进行选择。
+
+**--list-unittests**：列举出可用的单元测试
+
+**--fatal-unittests**：当单元测试失败时，将会产生错误。
+
+
+
 然后从命令行设置debug级别
 
 ```

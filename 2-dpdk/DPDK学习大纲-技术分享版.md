@@ -544,7 +544,7 @@ master和worker之间的通信机制如下图所示：
 
 # 三、CPU Packet Processing数据包处理
 
-## **1、Toeplitz Hash库**
+## **3、1 Toeplitz Hash库**
 
 https://doc.dpdk.org/guides/prog_guide/toeplitz_hash_lib.html
 
@@ -584,7 +584,7 @@ https://doc.dpdk.org/guides/prog_guide/ip_fragment_reassembly_lib.html
 
 
 
-## 3、**4 Packet Classification And Access Control(ACL)库**
+## 3、**4 数据报分类和ACL库**
 
 https://doc.dpdk.org/guides/prog_guide/packet_classif_access_ctrl.html
 

@@ -6,7 +6,7 @@
 
 ![image-20250512162712011](./picture/image-20250512162712011.png)
 
- 流表建立要从FlowWorker函数说起，在解码模块中已经调用函数FlowSetupPacket根据五元组设置了流的hash值p->flow_hash，并且设置了标志位PKT_WANTS_FLOW，表示这个是由网络收包经过解码模块而来的真正的packet数据包
+流表建立要从FlowWorker函数说起，在解码模块中已经调用函数FlowSetupPacket根据五元组设置了流的hash值p->flow_hash，并且设置了标志位PKT_WANTS_FLOW，表示这个是由网络收包经过解码模块而来的真正的packet数据包
 
 ```
 void FlowSetupPacket(Packet *p)

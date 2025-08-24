@@ -2,7 +2,156 @@
 
 ## 1、1 Flow结构体
 
-相关代码结构在flow.h文件中，里面的成员变量很多，这里就不一一表明了。
+相关代码结构在flow.h文件中，里面的成员变量很多。
+
+```
+ typedef struct Flow_
+{
+    /* flow "header", used for hashing and flow lookup. Static after init,
+     * so safe to look at without lock */
+    FlowAddress src, dst; //源地址和目的地址
+    union {
+        Port sp;        /**< tcp/udp 源端口 */
+        struct {
+            uint8_t type;   /**< icmp 类型 */
+            uint8_t code;   /**< icmp 代码 */
+        } icmp_s;
+
+        struct {
+            uint32_t spi; /**< esp spi */
+        } esp;
+    };
+    union {
+        Port dp;        /**< tcp/udp 目的端口 */
+        struct {
+            uint8_t type;   /**< icmp 类型 */
+            uint8_t code;   /**< icmp 代码 */
+        } icmp_d;
+    };
+    uint8_t proto; //ip协议号
+    uint8_t recursion_level; //递归级别
+    uint16_t vlan_id[VLAN_MAX_LAYERS]; //VLAN 标识符数组
+
+    uint8_t vlan_idx;
+
+    /* track toserver/toclient flow timeout needs */
+    union {
+        struct {
+            uint8_t ffr_ts:4;
+            uint8_t ffr_tc:4;
+        };
+        uint8_t ffr;
+    };
+
+    /** Thread ID for the stream/detect portion of this flow */
+    FlowThreadId thread_id[2]; //流的检测线程id
+
+    struct Flow_ *next; //哈希表中的下一个流
+    struct LiveDevice_ *livedev; //实时设备
+
+    /** flow hash - the flow hash before hash table size mod. */
+    uint32_t flow_hash; //流的哈希值
+
+    /** timeout in seconds by policy, add to Flow::lastts to get actual time this times out.
+     * Ignored in emergency mode. */
+    uint32_t timeout_policy; //超时策略
+
+    /* time stamp of last update (last packet). Set/updated under the
+     * flow and flow hash row locks, safe to read under either the
+     * flow lock or flow hash row lock. */
+    SCTime_t lastts; //最后一个数据包更新的时间戳
+
+    FlowStateType flow_state; //流的状态
+
+    /** flow tenant id, used to setup flow timeout and stream pseudo
+     *  packets with the correct tenant id set */
+    uint32_t tenant_id;
+
+    uint32_t probing_parser_toserver_alproto_masks;
+    uint32_t probing_parser_toclient_alproto_masks;
+
+    uint32_t flags;         /**< generic flags */
+
+    uint16_t file_flags;    /**< file tracking/extraction flags */
+
+    /** destination port to be used in protocol detection. This is meant
+     *  for use with STARTTLS and HTTP CONNECT detection */
+    uint16_t protodetect_dp; /**< 0 if not used */
+
+    /* Parent flow id for protocol like ftp */
+    int64_t parent_id;
+
+#ifdef FLOWLOCK_RWLOCK
+    SCRWLock r;
+#elif defined FLOWLOCK_MUTEX
+    SCMutex m; //流互斥锁
+#else
+    #error Enable FLOWLOCK_RWLOCK or FLOWLOCK_MUTEX
+#endif
+
+    /** protocol specific data pointer, e.g. for TcpSession */
+    void *protoctx; //协议特定上下文
+
+    /** mapping to Flow's protocol specific protocols for timeouts
+        and state and free functions. */
+    uint8_t protomap;
+
+    uint8_t flow_end_flags;
+    /* coccinelle: Flow:flow_end_flags:FLOW_END_FLAG_ */
+
+    AppProto alproto; //应用层协议
+    AppProto alproto_ts;//到server端的应用层协议
+    AppProto alproto_tc;//到client端的应用层协议
+
+    /** original application level protocol. Used to indicate the previous
+       protocol when changing to another protocol , e.g. with STARTTLS. */
+    AppProto alproto_orig;
+    /** expected app protocol: used in protocol change/upgrade like in
+     *  STARTTLS. */
+    AppProto alproto_expect;
+
+    /** detection engine ctx version used to inspect this flow. Set at initial
+     *  inspection. If it doesn't match the currently in use de_ctx, the
+     *  stored sgh ptrs are reset. */
+    uint32_t de_ctx_version;
+
+    /** ttl tracking */
+    uint8_t min_ttl_toserver;
+    uint8_t max_ttl_toserver;
+    uint8_t min_ttl_toclient;
+    uint8_t max_ttl_toclient;
+
+    /** which exception policies were applied, if any */
+    uint8_t applied_exception_policy;
+
+    /** application level storage ptrs.
+     *
+     */
+    AppLayerParserState *alparser;     /*应用层解析器状态*/
+    void *alstate;      /*应用层状态*/
+
+    /** toclient sgh for this flow. Only use when FLOW_SGH_TOCLIENT flow flag
+     *  has been set. */
+    const struct SigGroupHead_ *sgh_toclient;
+    /** toserver sgh for this flow. Only use when FLOW_SGH_TOSERVER flow flag
+     *  has been set. */
+    const struct SigGroupHead_ *sgh_toserver;
+
+    /* pointer to the var list */
+    GenericVar *flowvar; //流变量列表
+
+    struct FlowBucket_ *fb; //流所属的哈希通Bucket
+
+    SCTime_t startts;	//流的开始时间
+
+    uint32_t todstpktcnt;//包计数
+    uint32_t tosrcpktcnt;//包计数
+    uint64_t todstbytecnt;//字节计数
+    uint64_t tosrcbytecnt;//字节计数
+
+    Storage storage[]; //零长数组
+} Flow;
+```
 
 
 
@@ -79,9 +228,9 @@ typedef struct FlowQueue_
 
 流管理使用独立的线程，包括老化线程和回收线程，可以启动多个线程，但默认启动一个线程。
 
- 老化线程：main-》SuricataMain-》RunModeDispatch-》FlowManagerThreadSpawn
+ 老化线程：main-》SuricataMain-》RunModeDispatch-》**FlowManagerThreadSpawn**
 
- 回收线程：main-》SuricataMain-》RunModeDispatch-》FlowRecyclerThreadSpawn
+ 回收线程：main-》SuricataMain-》RunModeDispatch-》**FlowRecyclerThreadSpawn**
 
 
 

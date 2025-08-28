@@ -1,3 +1,37 @@
+cursor rules规则
+
+## 如何配置Cursor Rules
+
+首先打开Cursor，点击`File - Preferences - Cursor Settings` 进入Cursor设置页面，然后点击 Rules就能看到规则页面了
+
+![image-20250827113002950](./picture/image-20250827113002950.png)
+
+在 Cursor 当中，支持两种级别的规则：
+
+- **全局规则（User Rules）**：针对所有项目通用的规则
+- **项目规则（Project Rules）**：存放于项目目录下的 `.cursor/rules` 中，只用于约束当前项目。
+
+我们这里演示下添加一个Project Rules规则：
+
+![image-20250827113210850](./picture/image-20250827113210850.png)
+
+点击“Add Rule”按钮后，会出现如下的界面：
+
+![image-20250827113324583](./picture/image-20250827113324583.png)
+
+将你的rules规则内容添加到其中即可。
+
+
+
+Cursor支持四种规则类型：
+
+![image-20250827113413809](./picture/image-20250827113413809.png)
+
+- Always Apply：始终应用规则
+- Apply Intelligently：AI根据规则说明来判断是否应用该规则
+- Apply to Specific Files：对指定模式的文件生效
+- Apply Manually：在使用@规则名时生效
+
 
 
 # 一、原版
@@ -479,3 +513,14 @@ alwaysApply: false
 - 必要时使用线程安全的数据结构。
 ```
 
+
+
+# 五、参考资源
+
+英文版的
+
+https://cursor.directory/rules/golang
+
+中文版的
+
+https://github.com/flyeric0212/cursor-rules/blob/main/languages/golang.mdc

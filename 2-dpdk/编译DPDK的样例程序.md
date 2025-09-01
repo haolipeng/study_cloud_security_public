@@ -121,3 +121,59 @@ meson configure -Dexamples=all
 ninja
 ```
 
+
+
+# 三、运行helloworld程序
+
+我把服务器上的大也内存关闭了，helloworld程序启动后显示如下：
+
+```
+root@r630-PowerEdge-R630:/home/work/dpdk-stable-24.11.1/examples/helloworld# ./build/helloworld -c 3 -n 2
+EAL: Detected CPU lcores: 72
+EAL: Detected NUMA nodes: 2
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: No free 1048576 kB hugepages reported on node 0
+EAL: No free 1048576 kB hugepages reported on node 1
+EAL: Cannot get hugepage information.
+EAL: PANIC in main():
+Cannot init EAL
+0: /home/work/dpdk-stable-24.11.1/dpdklib/lib/x86_64-linux-gnu/librte_eal.so.25 (rte_dump_stack+0x42) [718b22d1a502]
+1: /home/work/dpdk-stable-24.11.1/dpdklib/lib/x86_64-linux-gnu/librte_eal.so.25 (__rte_panic+0xd0) [718b22cf33f7]
+2: ./build/helloworld (571f97d3a000+0x115c) [571f97d3b15c]
+3: /lib/x86_64-linux-gnu/libc.so.6 (718b22a00000+0x2a1ca) [718b22a2a1ca]
+4: /lib/x86_64-linux-gnu/libc.so.6 (__libc_start_main+0x8b) [718b22a2a28b]
+5: ./build/helloworld (571f97d3a000+0x1235) [571f97d3b235]
+已中止 (核心已转储)
+```
+
+其报错信息也很明显，没有可用的大页内存使用，所以DPDK库初始化EAL失败，导致程序退出。
+
+```
+EAL: No free 1048576 kB hugepages reported on node 0
+EAL: No free 1048576 kB hugepages reported on node 1
+EAL: Cannot get hugepage information.
+EAL: PANIC in main():
+Cannot init EAL
+```
+
+**如果你的服务器的确不支持大页内存的话，那么可以添加下--no-huge命令，让程序先启动起来。**
+
+```
+root@r630-PowerEdge-R630:/home/work/dpdk-stable-24.11.1/examples/helloworld# ./build/helloworld -c 3 -n 2 --no-huge
+EAL: Detected CPU lcores: 72
+EAL: Detected NUMA nodes: 2
+EAL: Static memory layout is selected, amount of reserved memory can be adjusted with -m or --socket-mem
+EAL: Detected shared linkage of DPDK
+EAL: Multi-process socket /var/run/dpdk/rte/mp_socket
+EAL: Selected IOVA mode 'VA'
+EAL: VFIO support initialized
+EAL: Using IOMMU type 1 (Type 1)
+EAL: lib.eal log level changed from info to debug
+worker lcore id:1
+hello from core 1
+hello from core 0
+```
+
+从图上可以看到，程序能够正常启动了。

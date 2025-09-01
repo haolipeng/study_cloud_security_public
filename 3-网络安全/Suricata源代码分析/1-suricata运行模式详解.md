@@ -6,15 +6,93 @@ suricata源代码分析系列是基于6.0.10版本的代码
 
 
 
-# 零、基础概念
+# 一、初识suricata运行模式
 
-组成运行模式的基本元素
+首先来看一下suricata有几种运行模式
+
+
+
+使用suricata的命令行--list-runmodes，可以查看支持多少种运行模式。
+
+TODO：这里还需要一个图。
+
+Suricata有多种运行模式，这些模式与抓包驱动和IDS、IPS选择相关联。抓包驱动包括：pcap，pcap file，dpdk等。
+
+Suricata在启动时只能选择某种运行模式。如-i表示pcap，-r表示pcap file。
+
+## 1、1 single模式
+
+单工作线程完成所有工作。第一个模块完成抓包，其他模块依次处理，没有后续队列。
+
+![single模式线程如图](picture/single.png)
+
+
+
+## 1、2 workers模式（高性能，难度适中）
+
+每个工作线程与single模式单线程工作流程一样，互不影响。
+
+- 线程数量：网卡接口数量 * 每个网卡接口可并发的抓包线程数。
+- 线程模块：内部与single模式一致。相当于一个线程内跑多个业务流程。
+
+![img](./picture/workers.png)
+
+其中FlowWorker为流管理模块，RespondReject为响应模块。
+
+
+
+我感觉自己对workers模式掌握的并不熟练。
+
+## 1、3 autofp模式（复杂，高性能）
+
+其中autofp模式是最高效的模型。
+
+两种数据包处理线程，分别是收包线程和检测线程。收包线程和检测线程间通过PacketQueue传递数据包进行处理，每个检测线程对应一个队列，多个检测线程时为数据包选择队列采用一致性哈希算法，以确保同一个流的数据包按顺序传递给同一个检测线程。
+
+
+
+![image-20250901231520103](./picture/image-20250901231520103.png)
+
+后续我们单独拿一个章节出来，好好讲下autofp模式。
+
+
+
+从上面的流程图可以看出autofp属于最高效的模式，也是最复杂的模式，worker适中。
+
+
+
+**packet的流水线：**
+
+1、Receive模块抓取数据包后，封装成packet结构体，传递给Decode模块；
+
+2、Decode模块根据数据包的类型解析对应上层协议（IP，TCP，UDP，HTTP协议等）
+
+3、将处理后的数据报继续扔给FlowWorker流管理模块；
+
+
+
+**线程模块：**
+
+线程模块是对packet处理任务的抽象。线程模块分为以下几种：
+
+| 模块名            | 作用                                                         |
+| ----------------- | ------------------------------------------------------------ |
+| Receive模块       | 收集网络数据包，封装成Packet对象后将其传递给Decode线程模块   |
+| Decode模块        | Packet按协议4层模型(数据链路层、网络层、传输层、应用层)进行解码，获取协议和负荷信息，解码完成后将Packet传递给FlowWorker线程模块。该模块主要是进行packet解码，不处理应用层。应用层由专门的应用层解码模块处理 |
+| FlowWorker模块    | 对packets进行分配flow，Tcp会话管理，TCP重组，应用层数据解析处理，Detect规则检测 |
+| RespondReject模块 | 根据detect检测后的结果，对于reject的包需要向双端发送reset包  |
+
+
+
+从上图中，我们能推测出组成**运行模式**的基本元素：
 
 suricata由线程、线程模块、队列组成。
 
-- 数据包在线程间传递通过队列实现，线程由多个线程模块组成，每个线程模块实现一种功能
+- 数据包在线程间传递通过队列实现，线程由多个线程模块组成，每个线程模块实现一种功能。
 - 一个数据包可以由多个线程处理，数据包将通过队列传递到下一个线程
 - 一个线程可以有一个或多个线程模块
+
+这块介绍的东西太过于抽象了，新手一上来是很不好理解的。
 
 
 
@@ -25,6 +103,28 @@ suricata由线程、线程模块、队列组成。
 AF_PACKET抓包流程是如上所示：
 
 TmThreadsSlotPktAcqLoop-》ReceiveAFPLoop-》AFPReadFromRing-》TmThreadsSlotProcessPkt-》TmThreadsSlotVarRun-》SlotFunc（FlowWorker）
+
+
+
+核心数据结构
+
+```
+typedef struct RunMode_ {
+    /* the runmode type */
+    int runmode;//抓包模式的index值
+    const char *name;//运行模式的字符串名
+    const char *description;//描述信息
+    int (*RunModeFunc)(void);//运行模式函数,在RunModeDispatch函数中被调用
+} RunMode;
+
+typedef struct RunModes_ {
+    int no_of_runmodes;//运行模式的数量
+    RunMode *runmodes;//存储不同运行模型下自定义模式的信息
+} RunModes;
+
+//划重点
+static RunModes runmodes[RUNMODE_USER_MAX];//二维数组，存储运行模式及自定义模式
+```
 
 
 
@@ -72,6 +172,8 @@ void RunModeIdsAFPRegister(void)
 ```
 
 其中每一种运行模式都调用RunModeRegisterNewRunMode函数注册各自的自定义模式。上面注册了AF_PAKCET的single、workers、autofp三种自定义模式。
+
+运行模式的核心数据结构：
 
 RunMode和RunModes结构体的定义如下：
 
@@ -910,45 +1012,6 @@ TmThreadCreate
 TmqCreateQueue
 
 TAILQ_INSERT_HEAD
-
-# 四、运行模式图解
-
-使用suricata的命令行--list-runmodes，可以查看支持多少种运行模式。
-
-
-
-## 4、1 single模式
-
-单工作线程完成所有工作。首个模块完成抓包，其他模块依次处理，没有后续队列。
-
-![single模式线程如图](picture/single.png)
-
-
-
-## 4、2 workers模式（高性能）
-
-每个工作线程与single模式单线程工作流程一样，互不影响。
-
-- 线程数量：网卡接口数量 * 每个网卡接口可并发的抓包线程数。
-- 线程模块：内部与single模式一致。相当于一个线程内跑多个业务流程。
-
-![workers模式线程如图](http://blog-image.hyuuhit.com/2018/03/suricata-thread-model/workers.png)
-
-
-
-我感觉自己对workers模式掌握的并不熟练。
-
-## 4、3 autofp模式（需细细研究）
-
-其中autofp模式是最高效的模型。
-
-两种数据包处理线程，分别是收包线程和检测线程。收包线程和检测线程间通过PacketQueue传递数据包进行处理，每个检测线程对应一个队列，多个检测线程时为数据包选择队列采用一致性哈希算法，以确保同一个流的数据包按顺序传递给同一个检测线程。
-
-
-
-![img](picture/webp-167689837266510.webp)
-
-后续我们单独拿一个章节出来，好好讲下autofp模式。
 
 
 

@@ -12,9 +12,17 @@ suricata源代码分析系列是基于6.0.10版本的代码
 
 
 
-使用suricata的命令行--list-runmodes，可以查看支持多少种运行模式。
+执行suricata --list-runmodes命令行，可以查看支持多少种运行模式。
 
-TODO：这里还需要一个图。
+![image-20250902111757062](./picture/image-20250902111757062.png)
+
+![image-20250902111822705](./picture/image-20250902111822705.png)
+
+上述只是把suricata --list-runmodes命令的执行结果的一部分进行了截图。
+
+其中第一列是RunMode Type运行模式类型，值可以为PCAP_DEV,PCAP_FILE,AF_PACKET_DEV等。
+
+第二列是Custom Mode自定义模式，可选值为
 
 
 

@@ -16,6 +16,8 @@ suricata源代码分析系列是基于6.0.10版本的代码
 
 TODO：这里还需要一个图。
 
+
+
 Suricata有多种运行模式，这些模式与抓包驱动和IDS、IPS选择相关联。抓包驱动包括：pcap，pcap file，dpdk等。
 
 Suricata在启动时只能选择某种运行模式。如-i表示pcap，-r表示pcap file。
@@ -84,6 +86,16 @@ Suricata在启动时只能选择某种运行模式。如-i表示pcap，-r表示p
 
 
 
+上述代码表示采用pcap file + single模式下，第一个线程中有三个线程模块，分为是ReceivePcapFile、DecodePcapFile、FlowWorker，这块很好理解。
+
+**线程、槽、模块之间关系**
+
+![img](picture/SouthEast.jpeg)
+
+每个线程都包含一个slot的链表，每个slot节点都悬挂着不同的模块，程序执行时会遍历slot链表，按照加入slot链表的顺序执行模块的函数。
+
+
+
 从上图中，我们能推测出组成**运行模式**的基本元素：
 
 suricata由线程、线程模块、队列组成。
@@ -128,9 +140,11 @@ static RunModes runmodes[RUNMODE_USER_MAX];//二维数组，存储运行模式�
 
 
 
-# 一、注册运行模式，填充runmodes表
+pcap模式，其内部还分为pcap live实时抓包，pcap offline离线抓包模式。
 
-## 1、1 注册不同运行模式
+# 二、注册运行模式，填充runmodes表
+
+## 2、1 注册不同运行模式
 
 ```c
 void RunModeRegisterRunModes(void)
@@ -239,7 +253,7 @@ void RunModeRegisterNewRunMode(int runmode, const char *name,
 
 
 
-## 1、2 运行不同模式的回调函数
+## 2、2 运行不同模式的回调函数
 
 ```
 void RunModeDispatch(int runmode, const char *custom_mode,
@@ -276,7 +290,7 @@ void RunModeDispatch(int runmode, const char *custom_mode,
 
 
 
-## 1、3 RunModeFunc pcap-file流程
+## 2、3 RunModeFunc pcap-file流程
 
 RunModeFunc回调函数我们上面讲过，我们以最简单的RunModeFilePcapSingle为例进行讲解.
 
@@ -400,7 +414,7 @@ slot->SlotFunc = tm->Func;此行代码是很重要的。
 
 
 
-### 1、3、1 线程模块
+### 2、3、1 线程模块
 
 上述代码表示采用pcap file + single模式下，第一个线程中有三个线程模块，分为是ReceivePcapFile、DecodePcapFile、FlowWorker，这块很好理解。
 
@@ -449,7 +463,7 @@ TmEcode TmThreadsSlotVarRun(ThreadVars *tv, Packet *p, TmSlot *slot)
 
 
 
-### 1、3、2 创建ThreadVars
+### 2、3、2 创建ThreadVars
 
 ```
 ThreadVars *TmThreadCreatePacketHandler(const char *name, const char *inq_name,
@@ -589,7 +603,7 @@ static TmEcode TmThreadSetSlots(ThreadVars *tv, const char *name, void *(*fn_p)(
 
 
 
-### 1、3、3 创建工作线程
+### 2、3、3 创建工作线程
 
 ```
 TmEcode TmThreadSpawn(ThreadVars *tv)
@@ -609,7 +623,7 @@ TmEcode TmThreadSpawn(ThreadVars *tv)
 
 
 
-## 1、4 RunMode af-packet流程
+## 2、4 RunMode af-packet流程
 
 其中mode->RunModeFunc();RunModeFunc在AF_PACKET运行模式下分别注册了如下函数：
 
@@ -686,9 +700,9 @@ decode_mod_name :解析数据模块的名称
 
 因为大体流程都和pcap file模式差不多，所以就不详细说了，感兴趣的自己看看。
 
-# 二、 注册模块，填充tmm_modules表
+# 三、 注册模块，填充tmm_modules表
 
-## 2、1 模块注册
+## 3、1 模块注册
 
 模块注册的函数调用堆栈为
 
@@ -765,7 +779,7 @@ void TmModuleDecodeAFPRegister (void)
 
 
 
-## 2、2 模块结构体和存储结构
+## 3、2 模块结构体和存储结构
 
 ```
 typedef struct TmModule_ {
@@ -836,7 +850,7 @@ typedef enum {
 
 
 
-## 2、3 模块初始化
+## 3、3 模块初始化
 
 模块初始化的函数是**TmModuleRunInit**，其调用之处是在RegisterAllModules函数之后，其调用堆栈如下：
 
@@ -875,7 +889,7 @@ void TmModuleRunInit(void)
 
 
 
-## 2、4 tmm_modules模块调用
+## 3、4 tmm_modules模块调用
 
 tmm_modules全局变量调用的位置如下图所示：
 
@@ -909,7 +923,7 @@ int RunModeFilePcapSingle(void)
 
 
 
-# 三、 注册队列处理函数，填充tmqh_table表
+# 四、 注册队列处理函数，填充tmqh_table表
 
 main函数 -> PostConfLoadedSetup函数 -> TmqhSetup函数
 
@@ -980,7 +994,7 @@ void TmqhFlowRegister(void)
 
 
 
-# 四、注册tmq_list
+# 五、注册tmq_list
 
 ```
 static TAILQ_HEAD(TmqList_, Tmq_) tmq_list = TAILQ_HEAD_INITIALIZER(tmq_list);
@@ -1015,7 +1029,7 @@ TAILQ_INSERT_HEAD
 
 
 
-# 五、线程模型-课后题
+# 六、线程模型-课后题
 
 关于线程模型的一些疑问,大家感兴趣的可以一起在评论区交流
 
@@ -1031,7 +1045,7 @@ TAILQ_INSERT_HEAD
 
 
 
-# 六、参考链接
+# 七、参考链接
 
 
 https://blog.csdn.net/ljq32/article/details/122380938

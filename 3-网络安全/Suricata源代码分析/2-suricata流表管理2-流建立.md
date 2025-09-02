@@ -6,7 +6,9 @@
 
 ![image-20250512162712011](./picture/image-20250512162712011.png)
 
-流表建立要从FlowWorker函数说起，在解码模块中已经调用函数FlowSetupPacket根据五元组设置了流的hash值p->flow_hash，并且设置了标志位PKT_WANTS_FLOW，表示这个是由网络收包经过解码模块而来的真正的packet数据包
+![image-20250902095027074](./picture/image-20250902095027074.png)
+
+流表建立要从FlowWorker函数说起，在解码模块中已经调用函数**FlowSetupPacket**根据五元组设置了流的hash值p->flow_hash，并且设置了标志位PKT_WANTS_FLOW，表示当前数据包需要进行流处理。
 
 ```
 void FlowSetupPacket(Packet *p)
@@ -16,11 +18,15 @@ void FlowSetupPacket(Packet *p)
 }
 ```
 
+设置过PKT_WANTS_FLOW后，数据包将被关联到一个Flow结构体，用于维护连接状态。
+
+suricata会根据计算出的流哈希值flow_hash在流表中查看对应的流对象，如果没有则创建新的流对象。
+
 
 
 ## 1、1 解码模块设置PKT_WANTS_FLOW标志
 
-各个**解码模块**（如ip、tcp、udp等模块）调用FlowSetupPacket，FlowSetupPacket调用FlowGetHash函数（基于五元组计算出流的hash）将函数返回值赋值给p->flow_hash，并且设置了标志位PKT_WANTS_FLOW，表示此数据包将走流处理模块FlowWorker。
+各个**解码模块**（如ip、tcp、udp等模块）调用**FlowSetupPacket**，**FlowSetupPacket**调用**FlowGetHash**函数（基于五元组计算出流的hash）将函数返回值赋值给p->flow_hash，并且设置了标志位PKT_WANTS_FLOW，表示此数据包将继续走流处理模块FlowWorker。
 
 ```
 static inline uint32_t FlowGetHash(const Packet *p)
@@ -28,50 +34,66 @@ static inline uint32_t FlowGetHash(const Packet *p)
     uint32_t hash = 0;
 
     if (p->ip4h != NULL) {
+        //如果数据包是TCP或UDP，则计算TCP或UDP的hash值
         if (p->tcph != NULL || p->udph != NULL) {
             FlowHashKey4 fhk;
 
+            //地址排序，比较源地址和目的地址，索引0的位置放置大的地址
             int ai = (p->src.addr_data32[0] > p->dst.addr_data32[0]);
             fhk.addrs[1-ai] = p->src.addr_data32[0];
             fhk.addrs[ai] = p->dst.addr_data32[0];
 
+            //端口排序，比较源端口和目的端口，索引0的位置放置大的端口
             const int pi = (p->sp > p->dp);
             fhk.ports[1-pi] = p->sp;
             fhk.ports[pi] = p->dp;
 
+            //协议类型
             fhk.proto = (uint16_t)p->proto;
+            //递归级别
             fhk.recur = (uint16_t)p->recursion_level;
+            //VLAN ID
             /* g_vlan_mask sets the vlan_ids to 0 if vlan.use-for-tracking
              * is disabled. */
             fhk.vlan_id[0] = p->vlan_id[0] & g_vlan_mask;
             fhk.vlan_id[1] = p->vlan_id[1] & g_vlan_mask;
 
-			//基于五元组 + vlan信息计算出hash值
+			//五元组哈希计算出一个hash值，将hash值返回
             hash = hashword(fhk.u32, 5, flow_config.hash_rand);
-        }
+        } 
     }
 
     return hash;
 }
 ```
 
-FlowSetupPacket函数实现是比较简单的。
-
-```
-void FlowSetupPacket(Packet *p)
-{
-    p->flags |= PKT_WANTS_FLOW;
-    p->flow_hash = FlowGetHash(p);
-}
-```
-
-FlowSetupPacket设置数据包标记为PKT_WANTS_FLOW。
-
 
 
 ## 1、2 Decoder解码模块和FlowWorker如何传递Packet
 
-不管是single模式、workers模式，都是将模块注册到线程中，然后在线程函数中以for循环的方式循环调用“不同模块”的回调函数，所以并不存在在不同模块间传递Packet数据包的情况。
+### Single模式
+
+在single模式下，只有一个数据包处理线程，该线程包含完整的数据包处理流水线。所有模块（包括Decoder和FlowWorker）都注册在同一个线程中，通过循环调用不同模块的回调函数来处理数据包。
+
+
+
+### Workers模式
+
+在workers模式下，每个处理线程都包含完整的数据包流水线。
+
+这意味着每个worker线程内部的Decoder和FlowWorker模块同样是通过模块回调机制而不是线程间传递来处理数据包的。
+
+
+
+不管是single模式还是workers模式，模块在同一个线程内通过回调机制循序执行，无数据包传递。
+
+
+
+### Autofp模式
+
+数据包在不同线程之间的传递才会通过队列机制，主要发生在：
+
+存在专门的Capture线程进行数据包抓取和数据包解码，然后将数据包通过队列传递给flow worker线程。
 
 
 
@@ -110,15 +132,15 @@ typedef struct FlowLookupStruct_
 
 ![image-20250512162353698](./picture/image-20250512162353698.png)
 
-FlowWorker -> FlowHandlePacket -> FlowGetFlowFromHash -> Flow Bucket
+**FlowWorker -> FlowHandlePacket -> FlowGetFlowFromHash -> Flow Bucket**
 
 流处理涉及到：
 
-1、根据数据包的五元组计算哈希值
+1、根据数据包的五元组计算哈希值flow_hash
 
-2、查找对应的FlowBucket
+2、根据flow_hash查找对应的FlowBucket
 
-3、将Flow流和数据包进行比较
+3、将Flow流和数据包进行比较（比较什么？）
 
 4、如果找不到流，则创建一个新的Flow流
 
@@ -142,7 +164,7 @@ static TmEcode FlowWorker(ThreadVars *tv, Packet *p, void *data)
 }
 ```
 
-FlowWorker函数中，当数据包带有PKT_WANTS_FLOW宏标志后，调用FlowHandlePacket函数进行流flow相关处理。
+FlowWorker函数中，当数据包带有PKT_WANTS_FLOW宏标志后，调用**FlowHandlePacket**函数进行流flow相关处理。
 
 ```
 void FlowHandlePacket(ThreadVars *tv, FlowLookupStruct *fls, Packet *p)
@@ -174,24 +196,15 @@ Flow *FlowGetFlowFromHash(ThreadVars *tv, FlowLookupStruct *fls, Packet *p, Flow
 {
     Flow *f = NULL;
 
-    /* get our hash bucket and lock it */
-    const uint32_t hash = p->flow_hash;
 	//以数据包的流哈希值为下标，获取哈希表中对应的FlowBucket（Bucket桶）
+    const uint32_t hash = p->flow_hash;
     FlowBucket *fb = &flow_hash[hash % flow_config.hash_size];
     FromHashLockBucket(fb);//行级锁，锁住一个bucket
 
-    /* see if the bucket already has a flow */
 	//bucket为空,调用FlowGetNew获取Flow
     if (fb->head == NULL) {
-        f = FlowGetNew(tv, fls, p);//新建流
-
-        /* flow is locked */
-        fb->head = f;//bucket的头结点为f
-
-        /* got one, now lock, initialize and return */
-        //流初始化并返回流
+        f = FlowGetNew(tv, fls, p);//新建流并初始化
         FlowInit(f, p);
-		......省略代码
         return f;
     }
 
@@ -203,26 +216,24 @@ Flow *FlowGetFlowFromHash(ThreadVars *tv, FlowLookupStruct *fls, Packet *p, Flow
         Flow *next_f = NULL;/*next flow*/
 		//检测流超时
         if (timedout) {
-            FromHashLockTO(f);//FLOWLOCK_WRLOCK(f);
-            //超时且引用计数为0，没有packet引用这个flow，则放到线程所属的work queue
+            FromHashLockTO(f);
+            //超时且引用计数为0，则回收flow到线程所属的队列中（流回收后续）
             if (likely(f->use_cnt == 0)) {
                 next_f = f->next;
-                MoveToWorkQueue(tv, fls, fb, f, prev_f);//放入线程所属的work queue
+                MoveToWorkQueue(tv, fls, fb, f, prev_f);//回收流，将其放入线程所属的work queue
                 FLOWLOCK_UNLOCK(f);
                 goto flow_removed;
             }
             FLOWLOCK_UNLOCK(f);
-        } else if (FlowCompare(f, p) != 0) {//找到了和packet匹配的流
-			//返回哈希值匹配的流
-            return f; /* return w/o releasing flow lock */
+        } else if (FlowCompare(f, p) != 0) {//找到了和packet匹配的流则返回
+            return f;
         }
-        /* unless we removed 'f', prev_f needs to point to
-         * current 'f' when adding a new flow below. */
+        
         prev_f = f;
         next_f = f->next;
 
 flow_removed:
-		//查询完所有flow都没有找到
+		//遍历完所有流都没有找到，则创建新流
         if (next_f == NULL) {
             f = FlowGetNew(tv, fls, p);
 
@@ -266,9 +277,21 @@ flow_removed:
 
 
 
-# 三、流创建艰难之旅
+# 三、流创建的艰难之旅
 
 ## 3、1 Flow创建流程概述
+
+Flow流创建涉及到一个关键的数据结构：**FlowLookupStruct结构体**
+
+```
+typedef struct FlowLookupStruct_ // TODO name
+{
+    FlowQueuePrivate spare_queue;//空闲队列，存储可重复利用的Flow对象
+    DecodeThreadVars *dtv;
+    FlowQueuePrivate work_queue;//工作队列，当Flow超时需要清理时，会将其放入工作队列中
+    uint32_t emerg_spare_sync_stamp;//紧急空闲同步时间戳
+} FlowLookupStruct;
+```
 
 上文提到流创建使用的是FlowGetNew函数，下面我们好好看下这个函数。
 
@@ -283,7 +306,6 @@ static Flow *FlowGetNew(ThreadVars *tv, FlowLookupStruct *fls, Packet *p)
         return NULL;
     }
 
-    /* get a flow from the spare queue */
 	//每个线程拥有一个FlowLookupStruct指针fls
 	//从线程所属的flow空闲队列里获取flow，如果获取成功则返回flow
     Flow *f = FlowQueuePrivateGetFromTop(&fls->spare_queue);
@@ -292,6 +314,7 @@ static Flow *FlowGetNew(ThreadVars *tv, FlowLookupStruct *fls, Packet *p)
 		//FlowSpareSync的功能是从全局flow内存池中获取一个flow队列
         f = FlowSpareSync(tv, fls, p, emerg);
     }
+    
 	//全局flow内存池，也没有flow队列
     if (f == NULL) {
         /* If we reached the max memcap, we get a used flow */
@@ -320,7 +343,7 @@ static Flow *FlowGetNew(ThreadVars *tv, FlowLookupStruct *fls, Packet *p)
     }
 
     FLOWLOCK_WRLOCK(f);
-    FlowUpdateCounter(tv, fls->dtv, p->proto);
+    FlowUpdateCounter(tv, fls->dtv, p->proto);//更新统计计数
     return f;
 }
 ```
@@ -404,7 +427,7 @@ static inline Flow *FlowSpareSync(ThreadVars *tv, FlowLookupStruct *fls,
             }
         }
     } else {
-    	//非紧急模式下，从全局内存池中拿出一个flow队列
+    	//非紧急模式下，从全局内存池中拿出一个flow队列，优先看这块
         fls->spare_queue = FlowSpareGetFromPool(); /* local empty, (re)populate and try again */
 		//从flow队列中取出一个flow
         f = FlowQueuePrivateGetFromTop(&fls->spare_queue);
@@ -413,6 +436,8 @@ static inline Flow *FlowSpareSync(ThreadVars *tv, FlowLookupStruct *fls,
     return f;
 }
 ```
+
+在非紧急模式下，调用了FlowSpareGetFromPool，从全局内存池中拿出一个flow流队列，然后再调用FlowQueuePrivateGetFromTop从flow流队列中获取flow对象。
 
 
 
@@ -471,7 +496,41 @@ FlowQueuePrivate FlowSpareGetFromPool(void)
 
 
 
-## 3、4 极端情况，复用引用计数为零的flow流
+## 3、4 FlowAlloc直接申请内存
+
+```
+Flow *FlowAlloc(void)
+{
+    Flow *f;
+    size_t size = sizeof(Flow) + FlowStorageSize();
+
+	//检测是否超出内存最大值，如果超出则返回NULL
+    if (!(FLOW_CHECK_MEMCAP(size))) {
+        return NULL;
+    }
+
+    //增加内存使用量
+    (void) SC_ATOMIC_ADD(flow_memuse, size);
+
+    //分配内存
+    f = SCMalloc(size);
+    if (unlikely(f == NULL)) {
+        (void)SC_ATOMIC_SUB(flow_memuse, size);
+        return NULL;
+    }
+    memset(f, 0, size);
+
+    //初始化Flow对象
+    FLOW_INITIALIZE(f);
+    return f;
+}
+```
+
+细看FlowAlloc函数，其内部直接调用SCMalloc（即malloc原始函数）申请内存空间，
+
+
+
+## 3、5 复用引用计数为零的flow流（极端场景）
 
 **调用时机：**
 
@@ -611,3 +670,40 @@ flow的终止标志有如下可设置的标志
 #define FLOW_END_FLAG_SHUTDOWN          0x40
 #define FLOW_END_FLAG_STATE_BYPASSED    0x80
 ```
+
+
+
+# 四、TODO内容
+
+MoveToWorkQueue函数未展开讲解，留着后面流回收的时候再进行讲解。
+
+```
+static inline void MoveToWorkQueue(ThreadVars *tv, FlowLookupStruct *fls,
+        FlowBucket *fb, Flow *f, Flow *prev_f)
+{
+    f->flow_end_flags |= FLOW_END_FLAG_TIMEOUT;
+
+    /* remove from hash... */
+    if (prev_f) {
+        prev_f->next = f->next;
+    }
+    if (f == fb->head) {
+        fb->head = f->next;
+    }
+
+    if (f->proto != IPPROTO_TCP || FlowBelongsToUs(tv, f)) { // TODO thread_id[] direction
+        f->fb = NULL;
+        f->next = NULL;
+        FlowQueuePrivateAppendFlow(&fls->work_queue, f);
+    } else {
+        /* implied: TCP but our thread does not own it. So set it
+         * aside for the Flow Manager to pick it up. */
+        f->next = fb->evicted;
+        fb->evicted = f;
+        if (SC_ATOMIC_GET(f->fb->next_ts) != 0) {
+            SC_ATOMIC_SET(f->fb->next_ts, 0);
+        }
+    }
+}
+```
+

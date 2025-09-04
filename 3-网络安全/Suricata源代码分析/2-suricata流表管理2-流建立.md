@@ -107,7 +107,7 @@ static inline uint32_t FlowGetHash(const Packet *p)
 typedef struct FlowLookupStruct_
 {
     /** thread store of spare queues */
-    //就是线程自己的空闲flow队列，从里边获取一个可用的flow，不够了从全局flow内存池获取一个flow队列
+    //就是线程自己的空闲flow队列，从里边获取一个可用的flow，不够了再从全局flow内存池获取一个新的FlowQueuePrivate
     FlowQueuePrivate spare_queue;
     
     //主要为了在处理过程调用输出记录flow日志时，需要用输出参数
@@ -204,6 +204,7 @@ Flow *FlowGetFlowFromHash(ThreadVars *tv, FlowLookupStruct *fls, Packet *p, Flow
 	//bucket为空,调用FlowGetNew获取Flow
     if (fb->head == NULL) {
         f = FlowGetNew(tv, fls, p);//新建流并初始化
+        fb->head = f;//将新申请的节点设置为bucket的头结点
         FlowInit(f, p);
         return f;
     }
@@ -279,12 +280,16 @@ flow_removed:
 
 # 三、流创建的艰难之旅
 
+从**FlowGetFlowFromHash**函数中调用**FlowGetNew**函数来创建Flow对象指针。
+
+
+
 ## 3、1 Flow创建流程概述
 
 Flow流创建涉及到一个关键的数据结构：**FlowLookupStruct结构体**
 
 ```
-typedef struct FlowLookupStruct_ // TODO name
+typedef struct FlowLookupStruct_
 {
     FlowQueuePrivate spare_queue;//空闲队列，存储可重复利用的Flow对象
     DecodeThreadVars *dtv;
@@ -359,6 +364,10 @@ static Flow *FlowGetNew(ThreadVars *tv, FlowLookupStruct *fls, Packet *p)
 **3、判断flow内存是否超过配置上限，不超过的话，直接调用函数FlowAlloc申请flow；**
 
 **4、flow内存超过配置上限，调用FlowGetUsedFlow函数，从全局flow_hash表中的bucket链表中，将引用计数为0的项取出来进行复用。**
+
+
+
+![image-20250904195847156](./picture/image-20250904195847156.png)
 
 
 
@@ -658,22 +667,7 @@ static Flow *FlowGetUsedFlow(ThreadVars *tv, DecodeThreadVars *dtv, const struct
 
 
 
-flow的终止标志有如下可设置的标志
-
-```
-#define FLOW_END_FLAG_STATE_NEW         0x01
-#define FLOW_END_FLAG_STATE_ESTABLISHED 0x02
-#define FLOW_END_FLAG_STATE_CLOSED      0x04
-#define FLOW_END_FLAG_EMERGENCY         0x08
-#define FLOW_END_FLAG_TIMEOUT           0x10
-#define FLOW_END_FLAG_FORCED            0x20
-#define FLOW_END_FLAG_SHUTDOWN          0x40
-#define FLOW_END_FLAG_STATE_BYPASSED    0x80
-```
-
-
-
-# 四、TODO内容
+# 四、疑问点和TODO:
 
 MoveToWorkQueue函数未展开讲解，留着后面流回收的时候再进行讲解。
 
@@ -707,3 +701,19 @@ static inline void MoveToWorkQueue(ThreadVars *tv, FlowLookupStruct *fls,
 }
 ```
 
+
+
+## 4、2 FlowQueue的管理
+
+不管是程序启动时自己申请的FlowQueue，还是从全局的flow_spare_pool中申请的FlowQueue，这些FlowQueue是如何组织起来的呢？
+又是如何管理和释放的呢？
+
+
+
+这个问题才是我真心关心的事情。
+
+为啥需要FlowManager线程呢？即FlowManager线程做什么事情呢？
+
+
+
+这么多FlowQueue，suricata是如何管理的呢？

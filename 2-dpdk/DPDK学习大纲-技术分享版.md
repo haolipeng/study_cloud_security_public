@@ -689,3 +689,25 @@ https://doc.dpdk.org/guides/prog_guide/graph_lib.html
 **13、BPF库**
 
 **14、Trace库**
+
+
+
+# 六、参考博客
+
+赵子清
+
+https://www.yuque.com/zzqcn
+
+
+
+有向无环图
+
+https://www.yuque.com/zzqcn/dpdk/mw3ecz
+
+赵子清大佬的文章真心太赞了，必须好好拜读下。
+
+
+
+DPDK graph图节点处理框架
+
+https://zhuanlan.zhihu.com/p/1926401723888558625

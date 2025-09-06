@@ -1,6 +1,6 @@
 # 一、流老化配置概述
 
-suricata使用单独的线程执行流老化任务，允许创建多个流老化线程，为每个线程分配老化任务，即每个老化线程只负责老化分配给自己的flow的bucket。
+suricata单独创建一个线程来执行流老化任务，允许创建多个流老化线程，为每个线程分配老化任务，即每个老化线程只负责老化分配给自己的flow的bucket。
 
 **如何配置多个流老化线程呢？**
 
@@ -38,11 +38,138 @@ void FlowManagerThreadSpawn(void)
 }
 ```
 
+流老化线程的核心函数是FlowManager函数，下面我们来好好分析下这个函数。
+
 
 
 # 二、FlowManager流管理流程梳理
 
+## 2、1 FlowManager函数核心流程梳理
+
 流老化线程入口函数是FlowManager模块的FlowManager函数，精简后的代码如下所示：
+
+其正常模式下的代码如图所示
+
+```
+static TmEcode FlowManager(ThreadVars *th_v, void *thread_data)
+{
+    //流管理线程数据
+    FlowManagerThreadData *ftd = thread_data;
+    struct timeval ts;
+    uint32_t established_cnt = 0, new_cnt = 0, closing_cnt = 0;
+    bool emerg = false; //紧急模式标志
+    bool prev_emerg = false; //上一次紧急模式标志
+    uint32_t other_last_sec = 0; /**< last sec stamp when defrag etc ran */
+    uint32_t flow_last_sec = 0;
+    memset(&ts, 0, sizeof(ts));
+
+    //所有协议的超时时间的最小值
+    const uint32_t min_timeout = FlowTimeoutsMin();
+    const uint32_t pass_in_sec = min_timeout ? min_timeout * 8 : 60;
+
+    /* don't start our activities until time is setup */
+    while (!TimeModeIsReady()) {
+        if (suricata_ctl_flags != 0)
+            return TM_ECODE_OK;
+    }
+    const bool time_is_live = TimeModeIsLive();
+
+    SCLogDebug("FM %s/%d starting. min_timeout %us. Full hash pass in %us", th_v->name,
+            ftd->instance, min_timeout, pass_in_sec);
+
+    struct timeval startts;
+    memset(&startts, 0, sizeof(startts));
+    gettimeofday(&startts, NULL);
+
+    uint32_t hash_pass_iter = 0;//记录下一次从那个bucket开始检查flow超时
+    uint32_t emerg_over_cnt = 0;
+    uint64_t next_run_ms = 0;
+
+    while (1)
+    {
+        //检查线程暂停标志
+		
+        /* 获取当前时间，并转换为秒和毫秒格式*/
+       
+        if (ts_ms >= next_run_ms) {
+            if (ftd->instance == 0) {
+                const uint32_t sq_len = FlowSpareGetPoolSize();
+                const uint32_t spare_perc = sq_len * 100 / flow_config.prealloc;
+                /* see if we still have enough spare flows */
+                if (spare_perc < 90 || spare_perc > 110) {
+                    FlowSparePoolUpdate(sq_len);//超过预分配比例后，会进行增减操作
+                }
+            }
+            const uint32_t secs_passed = rt - flow_last_sec;
+
+            FlowTimeoutCounters counters = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+            /* 非紧急模式：分段扫描 */
+            const uint32_t chunks = MIN(secs_passed, pass_in_sec);
+            for (uint32_t i = 0; i < chunks; i++) {
+                FlowTimeoutHashInChunks(&ftd->timeout, &ts, ftd->min, ftd->max,
+                        &counters, hash_pass_iter, pass_in_sec);
+                hash_pass_iter++;
+                if (hash_pass_iter == pass_in_sec) {
+                    hash_pass_iter = 0;
+                }
+            }
+            
+            flow_last_sec = rt;
+
+            uint32_t len = FlowSpareGetPoolSize();
+
+            //正常模式下，下次轮询时间间隔为667ms，约1.5次/秒
+            next_run_ms = ts_ms + 667;
+        }//end with if (ts_ms >= next_run_ms)
+        
+        if (flow_last_sec == 0) {
+			//第一次走这里
+            flow_last_sec = rt;
+        }
+
+        if (ftd->instance == 0 &&
+                (other_last_sec == 0 || other_last_sec < (uint32_t)ts.tv_sec)) {
+            DefragTimeoutHash(&ts);//分片超时处理
+            HostTimeoutHash(&ts);//主机超时处理
+            IPPairTimeoutHash(&ts);//ip对超时处理
+            other_last_sec = (uint32_t)ts.tv_sec;
+        }
+
+        //start 正常模式：使用条件变量等待
+        struct timeval cond_tv;
+        gettimeofday(&cond_tv, NULL);
+        struct timeval add_tv;
+        add_tv.tv_sec = 0;
+        add_tv.tv_usec = 667 * 1000;
+        timeradd(&cond_tv, &add_tv, &cond_tv);
+
+        struct timespec cond_time = FROM_TIMEVAL(cond_tv);
+        SCCtrlMutexLock(&flow_manager_ctrl_mutex);
+        while (1) {
+            int rc = SCCtrlCondTimedwait(
+                    &flow_manager_ctrl_cond, &flow_manager_ctrl_mutex, &cond_time);
+            if (rc == ETIMEDOUT || rc < 0)
+                break;
+            if (SC_ATOMIC_GET(flow_flags) & FLOW_EMERGENCY) {
+                break; //紧急模式时，立即唤醒
+            }
+        }
+        SCCtrlMutexUnlock(&flow_manager_ctrl_mutex);
+        //end 正常模式：使用条件变量等待
+
+        SCLogDebug("woke up... %s", SC_ATOMIC_GET(flow_flags) & FLOW_EMERGENCY ? "emergency":"");
+
+        StatsSyncCountersIfSignalled(th_v);
+    }
+
+    return TM_ECODE_OK;
+}
+```
+
+
+
+完整版直接看
 
 ```
 static TmEcode FlowManager(ThreadVars *th_v, void *thread_data)
@@ -86,11 +213,12 @@ static TmEcode FlowManager(ThreadVars *th_v, void *thread_data)
         
         //到达下一次检查时间，则开始超时检查
         if (ts_ms >= next_run_ms) {
-        	//instance为零代表是第一个老化线程，则负责维护空闲flow的数量
+        	//instance为零代表是第一个老化线程，只有第一个实例负责维护空闲flow的数量
         	//将范围维护在90%-110%之间，上下浮动10%的样子
             if (ftd->instance == 0) {
-            	//获取空闲flow总数
+            	//获取全局空闲flow池中总数
                 const uint32_t sq_len = FlowSpareGetPoolSize();
+                
                 //计算空闲flow百分比
                 const uint32_t spare_perc = sq_len * 100 / flow_config.prealloc;
                 /* see if we still have enough spare flows */
@@ -104,10 +232,10 @@ static TmEcode FlowManager(ThreadVars *th_v, void *thread_data)
             ......省略代码......
 
             if (emerg) {
-                //紧急模式下，调用FlowTimeoutHash进行老化检查
+                //紧急模式下，进行“全表扫描”
                 FlowTimeoutHash(&ftd->timeout, &ts, ftd->min, ftd->max, &counters);
             } else {
-                //正常模式，则将flow bucket分时-分段检查
+                //正常模式下，进行flow bucket桶分时-分段检查
                 //chunks就是根据经过的秒数，把bucket分成多个范围，每次轮询只检查数个bucket
                 //当然如果经过的秒数是0，则一个bucket也不检查.
                 const uint32_t chunks = MIN(secs_passed, pass_in_sec);
@@ -696,6 +824,8 @@ static void CheckWorkQueue(ThreadVars *tv, FlowWorkerThreadData *fw,
 }
 ```
 
+
+
 FlowSparePoolReturnFlow函数的代码简化后如下所示：
 
 ```
@@ -771,3 +901,8 @@ static uint32_t FlowTimeoutHashInChunks(FlowManagerTimeoutThread *td,
 }
 ```
 
+
+
+# 五、疑问点
+
+ProcessAsideQueue的调用栈是什么样的？

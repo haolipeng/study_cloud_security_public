@@ -446,7 +446,11 @@ static inline Flow *FlowSpareSync(ThreadVars *tv, FlowLookupStruct *fls,
 }
 ```
 
-在非紧急模式下，调用了FlowSpareGetFromPool，从全局内存池中拿出一个flow流队列，然后再调用FlowQueuePrivateGetFromTop从flow流队列中获取flow对象。
+我们不关心紧急模式，所以只看一下非紧急模式下的代码逻辑。
+
+在非紧急模式下，调用了FlowSpareGetFromPool，从全局内存池中拿出一个flow流队列并将其赋值给fls->spare_queue（这里没问题吗？参见4、1 章节的Spare Queue的生命周期问题）;
+
+然后再调用FlowQueuePrivateGetFromTop从flow流队列中获取flow对象。
 
 
 
@@ -667,7 +671,41 @@ static Flow *FlowGetUsedFlow(ThreadVars *tv, DecodeThreadVars *dtv, const struct
 
 
 
-# 四、疑问点和TODO:
+# 四、疑问点
+
+## 4、1 Spare Queue生命周期
+
+```
+typedef struct FlowLookupStruct_
+{
+    //就是线程自己的空闲flow队列，从里边获取一个可用的flow，不够了再从全局flow内存池获取一个新的FlowQueuePrivate
+    FlowQueuePrivate spare_queue;
+} FlowLookupStruct;
+```
+
+不管是程序启动时自己线程申请的spare_queue，还是从全局的flow_spare_pool中申请的spare_queue，这些FlowLookupStruct变量中spare_queue是如何组织起来的呢？又是如何管理和释放的呢？
+
+
+
+当时我把spare_queue想象成指针类型了，当执行 fls->spare_queue = FlowSpareGetFromPool(); 时，这是将新的 FlowQueuePrivate 结构体的值拷贝到 fls->spare_queue 中，原来的 FlowQueuePrivate 结构体中的 top、bot、len 字段会被新值覆盖。
+
+
+
+而FlowQueuePrivate中的Flow对象会被正确释放的。
+
+1、Flow对象的生命周期
+
+
+
+
+
+
+
+这么多FlowQueue，suricata是如何管理的呢？
+
+
+
+## 4、2 MoveToWorkQueue函数
 
 MoveToWorkQueue函数未展开讲解，留着后面流回收的时候再进行讲解。
 
@@ -701,19 +739,3 @@ static inline void MoveToWorkQueue(ThreadVars *tv, FlowLookupStruct *fls,
 }
 ```
 
-
-
-## 4、2 FlowQueue的管理
-
-不管是程序启动时自己申请的FlowQueue，还是从全局的flow_spare_pool中申请的FlowQueue，这些FlowQueue是如何组织起来的呢？
-又是如何管理和释放的呢？
-
-
-
-这个问题才是我真心关心的事情。
-
-为啥需要FlowManager线程呢？即FlowManager线程做什么事情呢？
-
-
-
-这么多FlowQueue，suricata是如何管理的呢？

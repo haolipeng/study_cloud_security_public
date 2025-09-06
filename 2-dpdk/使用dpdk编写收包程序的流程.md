@@ -1,10 +1,48 @@
-在我的ubuntu 21.10实体机器里面使用dpdk的uio驱动绑定网卡，会遇到下面的错误
-
-Error: IOMMU support is disabled, use --noiommu-mode for binding in noiommu mode
 
 
+在dpdk程序中，是分为三个小组件
 
-# 一、EAL初始化
+core：cpu核心
+
+queue：网口有多个队列
+
+port：网口
+
+RTE_ETH_FOREACH_DEV 遍历当前端口列表的宏
+
+
+
+rte_eal_init
+
+l2fwd_parse_args
+
+rte_eth_dev_count_avail
+
+rte_pktmbuf_pool_create
+
+rte_eth_dev_info_get
+
+rte_eth_dev_configure
+
+rte_eth_rx_queue_setup
+
+rte_eth_dev_start
+
+rte_eth_promiscuous_enable
+
+rte_eal_mp_remote_launch
+
+rte_eth_dev_stop
+
+rte_eth_dev_close
+
+rte_eal_cleanup
+
+
+
+# 一、EAL环境初始化
+
+调用rte_eal_init函数
 
 ```
 // 初始化 EAL(Environment Abstraction Layer)
@@ -13,7 +51,15 @@ ret = rte_eal_init(argc, argv);
 
 
 
-# 二、内存池初始化
+获取可用网口数量
+
+rte_eth_dev_count_avail()
+
+
+
+# 二、创建mbuf内存池
+
+目的：mbuf内存池用于接收数据包
 
 ```
 struct rte_mempool *rte_pktmbuf_pool_create(
@@ -26,13 +72,13 @@ struct rte_mempool *rte_pktmbuf_pool_create(
 );
 ```
 
-name: 内存池唯一标识符
-n: 池中 mbuf 总数，通常为 NUM_MBUFS * 端口数
-cache_size: 每个核心的本地缓存大小，建议值为 RTE_MEMPOOL_CACHE_MAX_SIZE 或 256
-priv_size: 每个 mbuf 的私有数据大小，通常为 0
-data_room_size: 每个 mbuf 的数据缓冲区大小，通常为 RTE_MBUF_DEFAULT_BUF_SIZE
-socket_id: NUMA socket ID，通常使用 rte_socket_id()
-返回值：成功返回内存池指针，失败返回 NULL
+**name:** 内存池唯一标识符
+**n:** 池中 mbuf 总数，通常为 NUM_MBUFS * 端口数
+**cache_size:** 每个核心的本地缓存大小，建议值为 RTE_MEMPOOL_CACHE_MAX_SIZE 或 256
+**priv_size:** 每个 mbuf 的私有数据大小，通常为 0
+**data_room_size:** 每个 mbuf 的数据缓冲区大小，通常为 RTE_MBUF_DEFAULT_BUF_SIZE
+**socket_id:** NUMA socket ID，通常使用 rte_socket_id()
+**返回值：**成功返回内存池指针，失败返回 NULL
 
 
 
@@ -46,6 +92,8 @@ int rte_eth_dev_configure(
     const struct rte_eth_conf *eth_conf // 端口配置结构
 );
 ```
+
+
 
 端口配置结构示例：
 
@@ -118,14 +166,21 @@ int rte_eth_tx_queue_setup(
 
 
 
-# 五、启动端口和混杂模式
+# 五、启动端口、开启混杂模式
 
 ```
 int rte_eth_dev_start(uint16_t port_id);
+```
+
+开启混杂模式
+
+```
 void rte_eth_promiscuous_enable(uint16_t port_id);
 ```
 
 
+
+两个函数都是传递port_id，一个端口就是0，以此类推。
 
 # 六、CPU亲和性设置
 
@@ -173,6 +228,8 @@ static int lcore_function(void *arg) {
 }
 ```
 
+下节课带大家一起看下mbuf的结构吧。
+
 
 
 # 八、清理和退出
@@ -212,7 +269,7 @@ int main(int argc, char *argv[]) {
             ret = rte_eth_rx_queue_setup(...);
         }
         
-        // 3.3 设置每个发送队列
+        // 3.3 设置每个发送队列（可选）
         for (q = 0; q < tx_rings; q++) {
             ret = rte_eth_tx_queue_setup(...);
         }
@@ -237,3 +294,10 @@ int main(int argc, char *argv[]) {
 }
 ```
 
+
+
+# 遇到问题
+
+在我的ubuntu 21.10实体机器里面使用dpdk的uio驱动绑定网卡，会遇到下面的错误
+
+Error: IOMMU support is disabled, use --noiommu-mode for binding in noiommu mode

@@ -54,7 +54,7 @@ PacketQueueFree
 
 
 
-# 二、队列Handler
+# 二、Packet生成路径
 
 Hander主要是处理什么逻辑？
 
@@ -70,6 +70,5 @@ Hander主要是处理什么逻辑？
 
 
 
-参考链接
 
-https://blog.csdn.net/superbfly/article/details/52677730
+

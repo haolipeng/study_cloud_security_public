@@ -59,8 +59,6 @@ CFLAGS="-g -O0" ./configure --prefix=/usr  --sysconfdir=/etc --localstatedir=/va
 
 
 
-
-
 **configure命令**
 
 将libhtp安装在suricata源代码目录**（推荐）**

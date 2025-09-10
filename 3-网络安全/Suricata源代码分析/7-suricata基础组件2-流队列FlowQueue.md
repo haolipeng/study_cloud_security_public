@@ -16,19 +16,6 @@ Suricata中使用队列来缓存数据包，包括缓存线程模块内部新产
 
 用于表示数据包队列的结构体为PacketQueue，其定义如下（省略了调试相关字段）
 
-```
-typedef struct PacketQueue_ {
-    Packet *top;
-    Packet *bot;
-    uint32_t len;
-#ifdef DBG_PERF
-    uint32_t dbg_maxlen;
-#endif /* DBG_PERF */
-    SCMutex mutex_q;
-    SCCondT cond_q;
-} PacketQueue;
-```
-
 
 
 二、线程内队列

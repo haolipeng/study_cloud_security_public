@@ -12,34 +12,6 @@ RTE_ETH_FOREACH_DEV 遍历当前端口列表的宏
 
 
 
-rte_eal_init
-
-l2fwd_parse_args
-
-rte_eth_dev_count_avail
-
-rte_pktmbuf_pool_create
-
-rte_eth_dev_info_get
-
-rte_eth_dev_configure
-
-rte_eth_rx_queue_setup
-
-rte_eth_dev_start
-
-rte_eth_promiscuous_enable
-
-rte_eal_mp_remote_launch
-
-rte_eth_dev_stop
-
-rte_eth_dev_close
-
-rte_eal_cleanup
-
-
-
 # 一、EAL环境初始化
 
 调用rte_eal_init函数
@@ -182,7 +154,7 @@ void rte_eth_promiscuous_enable(uint16_t port_id);
 
 两个函数都是传递port_id，一个端口就是0，以此类推。
 
-# 六、CPU亲和性设置
+# 六、运行数据包接收
 
 ```
 // 将线程绑定到指定 CPU 核心
@@ -193,8 +165,6 @@ RTE_LCORE_FOREACH_SLAVE(lcore_id) {
 ```
 
 
-
-# 七、数据包接收循环
 
 ```
 // 接收数据包的主循环

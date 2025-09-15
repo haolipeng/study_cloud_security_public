@@ -31,6 +31,41 @@ libmagic-dev libjansson-dev rustc cargo jq git-core
 
 
 
+## 创建veth pair接口
+
+### 1、创建虚拟网桥接口
+
+```
+# 创建虚拟网桥
+sudo ip link add name br-suricata type bridge
+sudo ip link set br-suricata up
+sudo ip addr add 192.168.100.1/24 dev br-suricata
+```
+
+
+
+### 2、创建虚拟以太网对（veth pair）
+
+```
+# 创建一对虚拟以太网接口
+sudo ip link add veth-suri0 type veth peer name veth-suri1
+sudo ip link set veth-suri0 up
+sudo ip link set veth-suri1 up
+sudo ip addr add 192.168.200.1/24 dev veth-suri0
+sudo ip addr add 192.168.200.2/24 dev veth-suri1
+```
+
+### 3、 创建TUN/TAP接口
+
+```
+# 创建TAP接口
+sudo ip tuntap add mode tap name tap-suri
+sudo ip link set tap-suri up
+sudo ip addr add 192.168.300.1/24 dev tap-suri
+```
+
+
+
 # 一、编译安装
 
 ## 1、1 configure命令

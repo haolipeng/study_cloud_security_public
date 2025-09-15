@@ -6,6 +6,99 @@ suricata源代码分析系列是基于6.0.10版本的代码
 
 
 
+源代码的架构层次
+
+| 源文件名                | 模块所属     | 作用                                     |
+| ----------------------- | ------------ | ---------------------------------------- |
+| src/runmodes.c          | 基础架构     | 运行模式核心实现                         |
+| src/runmodes.h          | 基础架构     | 运行模式定义                             |
+| src/suricata.c          | 基础架构     | 主程序入口                               |
+| src/tm-threads.c        | 基础架构     | 线程模块管理                             |
+| src/tm-threads.h        | 基础架构     | 线程模块的定义                           |
+| src/threadvars.h        | 基础架构     | 线程变量定义                             |
+|                         |              |                                          |
+| src/runmode-af-packet.c | 运行模式     | AF_PACKET 模式实现                       |
+| src/source-af-packet.c  | 运行模式     | AF_PACKET 数据源                         |
+| src/runmode-af-packet.h | 运行模式     | AF_PACKET 模式头文件(pcap,pcap-file同理) |
+|                         |              |                                          |
+| src/tm-queues.c         | 线程间通信   | 线程队列管理                             |
+| src/tm-queues.h         | 线程间通信   | 线程队列接口                             |
+| src/tmqh-*.c            | 线程间通信   | 队列处理器实现                           |
+|                         |              |                                          |
+| src/decode.c            | 解码模块     | 数据包解码核心                           |
+| src/decode-*.c          | 解码模块     | 各种协议解码器                           |
+|                         |              |                                          |
+| src/detect.c            | 检测引擎模块 | 检测引擎核心                             |
+| src/detect-engine.c     | 检测引擎模块 | 检测引擎实现                             |
+| src/detect-*.c          | 检测引擎模块 | 各种检测模块                             |
+|                         |              |                                          |
+| src/flow.c              | 流管理       | 流相关文件                               |
+| src/flow-manager.c      | 流管理       | 流管理器                                 |
+| src/flow-*.c            | 流管理       | 流相关功能                               |
+|                         |              |                                          |
+
+
+
+**从个人角度来思考：**
+
+如果让我来设计，从场景分析上来看，一个线程上可能运行多个不同的功能（比如数据包捕获、解析、统计信息等），这些功能之间是彼此有联系的。
+
+那么把这些功能封装下，统称为Thread Module线程模块，每个模块中有多个串行执行的功能子模块，我觉得这个设计挺好的。
+
+
+
+线程类型分类：
+
+- 接收线程 (Receive Threads): 负责数据包捕获
+
+- 解码线程 (Decode Threads): 负责数据包解码
+
+- 检测线程 (Detect Threads): 负责规则匹配和检测
+
+- 流管理线程 (Flow Manager): 负责流状态管理
+
+- 输出线程 (Output Threads): 负责日志输出
+
+- 管理线程 (Management Threads): 负责系统管理
+
+**其中流管理线程和管理线程之间的区别是什么？**线程命名规范：
+
+```
+const char *thread_name_autofp = "RX";//autofp工作模式线程
+const char *thread_name_single = "W";//单线程工作模式线程
+const char *thread_name_workers = "W";//多线程worker工作模式线程
+const char *thread_name_verdict = "TX";//裁决线程
+const char *thread_name_flow_mgr = "FM";//流管理线程
+const char *thread_name_flow_rec = "FR";//流回收线程
+const char *thread_name_flow_bypass = "FB";//流绕过线程
+```
+
+
+
+具体运行模式
+
+#### AF_PACKET 模式
+
+```
+src/runmode-af-packet.c    # AF_PACKET 模式实现
+src/source-af-packet.c     # AF_PACKET 数据源
+src/runmode-af-packet.h    # AF_PACKET 模式头文件
+```
+
+#### PCAP 模式深入研究
+
+```
+src/runmode-pcap.c         # PCAP 模式实现
+src/source-pcap.c          # PCAP 数据源
+src/runmode-pcap.h         # PCAP 模式头文件
+```
+
+
+
+
+
+
+
 # 一、初识suricata运行模式
 
 首先来看一下suricata有几种运行模式

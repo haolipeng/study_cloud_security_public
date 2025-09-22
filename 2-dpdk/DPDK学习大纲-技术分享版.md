@@ -578,6 +578,8 @@ master和worker之间的通信机制如下图所示：
 
 **4、多进程支持**
 
+**5、内存池**
+
 
 
 # 三、CPU Packet Processing数据包处理
@@ -588,7 +590,7 @@ https://doc.dpdk.org/guides/prog_guide/toeplitz_hash_lib.html
 
 
 
-## **3、2 Hash库**
+## **3、2 Hash库（已完成）**
 
 Use Case: Flow Classification
 
@@ -685,6 +687,8 @@ https://doc.dpdk.org/guides/prog_guide/graph_lib.html
 **13、BPF库**
 
 **14、Trace库**
+
+
 
 
 

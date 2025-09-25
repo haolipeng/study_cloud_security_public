@@ -71,7 +71,24 @@ value: 包含状态机 (如 ESTABLISHED 等)、统计数据 (bps/bpp)、指针�
 
 **rte_mempool**
 
-- 管理会话表中 value 的内存池分配和释放
+- 管理会
+- 话表中 value 的内存池分配和释放
+
+
+
+dpdk 内存池的使用，需要单开一节课来讲解下，不能因为简单就不讲了。
+
+
+
+dpdk内存池简介文档：
+
+https://doc.dpdk.org/guides-25.07/prog_guide/mempool_lib.html
+
+
+
+其api使用文档：
+
+https://doc.dpdk.org/api-20.11/rte__mempool_8h.html
 
 
 

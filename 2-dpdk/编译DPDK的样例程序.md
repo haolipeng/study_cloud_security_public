@@ -158,6 +158,8 @@ EAL: PANIC in main():
 Cannot init EAL
 ```
 
+
+
 **如果你的服务器的确不支持大页内存的话，那么可以添加下--no-huge命令，让程序先启动起来。**
 
 ```

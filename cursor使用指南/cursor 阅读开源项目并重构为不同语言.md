@@ -1,10 +1,12 @@
 
 
+# 一、提出问题
+
 公司项目有时候会借鉴多个开源项目的核心功能（有主机安全也有网络安全的），组成一个新的牛逼功能，那么我在使用cursor写代码时，要如何使用它来借鉴多个开源项目的核心技术呢？
 
 
 
-之前没有ai工具时，流程大致如下
+之前没有ai工具时，程序实现上述需求的流程大致如下
 1、首先，公司项目借鉴A项目的某个功能模块，我先调研下此功能模块的技术选型，使用了什么技术，为啥使用这个技术
 2、其次，梳理这个功能模块的实现思路，整理成文档
 3、再次，根据梳理的技术实现思路和文档，再实现一个最小化的demo
@@ -13,6 +15,10 @@
 
 
 通过听陈天老师的b站视频《如何用 cursor 阅读 golang 源码，并生成对应的 Rust 代码？》，https://www.bilibili.com/video/BV1LPTUz8ExS/?spm_id_from=333.1387.top_right_bar_window_history.content.click&vd_source=553cfea04504936858081191fc1520dc
+
+
+
+陈天老师的开源项目地址为https://github.com/tyrchen/grpc-client
 
 
 
@@ -97,6 +103,8 @@ please follow @rust/core/design-patterns.mdc @rust/core/code-quality.mdc @depend
 
 具体方法：
 
+对于从0到1的项目，使用speckit工具来来进行要更好
+
 https://github.com/github/spec-kit
 
 
@@ -104,6 +112,10 @@ https://github.com/github/spec-kit
 cursor memory bank功能:
 
 https://cursor.zone/faq/how-to-use-cursor-memory-bank.html
+
+
+
+陈天
 
 
 

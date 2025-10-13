@@ -16,6 +16,8 @@ Cursor Memory Bank 是一个强大的AI记忆增强工具，解决了 AI 在**�
 
 Memory Bank 的核心思想是：AI 的短期记忆会重置，但我们可以通过外部文档提供长期记忆，就像人类通过笔记和文档来延伸自己的记忆能力一样。
 
+
+
 Memory Bank的作用
 --------------
 
@@ -298,4 +300,8 @@ Cursor Memory Bank提供了一种有效的机制，通过持久化的结构化�
 
 引用的链接
 
-URL Source: https://cursor.zone/faq/how-to-use-cursor-memory-bank.html
+https://cursor.zone/faq/how-to-use-cursor-memory-bank.html
+
+
+
+https://github.com/vanzan01/cursor-memory-bank

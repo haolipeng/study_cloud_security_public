@@ -85,6 +85,19 @@ please follow @rust/core/design-patterns.mdc @rust/core/code-quality.mdc @depend
 
 # 一、使用AI阅读开源代码
 
+deepwiki网站适合对项目进行初步的了解，其内容还是显得太单薄了点。
+
+看什么？
+
+- 核心功能
+- 核心设计思路
+
+
+
+重点：将以上内容写入./specs/design.md中，并添加mermaid chart来揭示数据结构之间的关系。
+
+
+
 在阅读开源代码上，AI相比程序员的优势在哪里呢？
 
 
@@ -98,6 +111,8 @@ please follow @rust/core/design-patterns.mdc @rust/core/code-quality.mdc @depend
 
 
 在家里的机器上，使用claude code帮我来阅读tracee的源代码，让自己能够更快的理解其核心技术实现，从而提升自己的技术能力。
+
+
 
 
 

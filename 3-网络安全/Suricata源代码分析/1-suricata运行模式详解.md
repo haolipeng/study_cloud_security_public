@@ -187,7 +187,7 @@ Suricata在启动时只能选择某种运行模式。如-i表示pcap，-r表示p
 
 
 
-上述代码表示采用pcap file + single模式下，第一个线程中有三个线程模块，分为是ReceivePcapFile、DecodePcapFile、FlowWorker，这块很好理解。
+采用pcap file + single模式下，第一个线程中有三个线程模块，分为是ReceivePcapFile、DecodePcapFile、FlowWorker，这块很好理解。
 
 **线程、槽、模块之间关系**
 
@@ -427,7 +427,7 @@ RunModeFilePcapSingle函数主要做了下3件事：
 
 - 创建ThreadVars
 - 创建不同功能的线程模块，并调用TmSlotSetFuncAppend添加到TmSlot中
-- 创建工作线程
+- 创建工作线程，即上述所有功能都在这个创建的工作线程中被调用
 
 
 
@@ -1161,5 +1161,817 @@ https://www.cnblogs.com/zhaodejin/p/16146212.html
 
 https://blog.csdn.net/vevenlcf/article/details/73123770
 
+---
 
+# 八、Runmode 运行模式深入分析（基于源代码）
+
+本章节基于 Suricata 6.0.10 源代码深入剖析 Runmode 运行模式的架构、实现细节和执行流程。
+
+## 8.1 Runmode 架构总览
+
+### 8.1.1 Runmode 类型枚举
+
+### 8.1.2 自定义模式（Custom Modes）
+
+每种 Runmode 类型下可以选择不同的自定义模式，影响线程架构：
+
+```mermaid
+graph LR
+    subgraph "Custom Modes"
+        A[single<br/>单线程模式]
+        B[workers<br/>多Worker模式]
+        C[autofp<br/>自动Flow负载均衡]
+    end
+
+    A --> A1[单线程处理<br/>所有任务]
+    B --> B1[每个Worker<br/>独立处理]
+    C --> C1[RX线程+<br/>多Worker线程]
+
+    style A fill:#fff9c4
+    style B fill:#c5e1a5
+    style C fill:#90caf9
+```
+
+## 8.2 Runmode 注册与初始化流程
+
+### 8.2.1 注册流程序列图
+
+```mermaid
+sequenceDiagram
+    participant Main as main()
+    participant Post as PostConfLoadedSetup()
+    participant Reg as RunModeRegisterRunModes()
+    participant AFP as RunModeIdsAFPRegister()
+    participant PCAP as RunModeIdsPcapRegister()
+    participant Arr as runmodes[]数组
+
+    Main->>Post: 调用
+    Post->>Reg: 注册所有运行模式
+
+    Reg->>AFP: 注册AF_PACKET模式
+    AFP->>Arr: RunModeRegisterNewRunMode<br/>(RUNMODE_AFP_DEV, "single", ...)
+    AFP->>Arr: RunModeRegisterNewRunMode<br/>(RUNMODE_AFP_DEV, "workers", ...)
+    AFP->>Arr: RunModeRegisterNewRunMode<br/>(RUNMODE_AFP_DEV, "autofp", ...)
+
+    Reg->>PCAP: 注册PCAP模式
+    PCAP->>Arr: RunModeRegisterNewRunMode<br/>(RUNMODE_PCAP_DEV, "single", ...)
+    PCAP->>Arr: RunModeRegisterNewRunMode<br/>(RUNMODE_PCAP_DEV, "workers", ...)
+    PCAP->>Arr: RunModeRegisterNewRunMode<br/>(RUNMODE_PCAP_DEV, "autofp", ...)
+
+    Note over Arr: runmodes[RUNMODE_AFP_DEV].runmodes[0-2]<br/>runmodes[RUNMODE_PCAP_DEV].runmodes[0-2]<br/>...
+```
+
+**关键代码位置：**
+- 注册入口：[src/runmodes.c:215](src/runmodes.c#L215) `RunModeRegisterRunModes()`
+- AF_PACKET 注册：[src/runmode-af-packet.c:60-80](src/runmode-af-packet.c#L60-L80) `RunModeIdsAFPRegister()`
+- PCAP 注册：[src/runmode-pcap.c:215-240](src/runmode-pcap.c#L215-L240) `RunModeIdsPcapRegister()`
+
+### 8.2.2 Runmode 数据结构
+
+```mermaid
+classDiagram
+    class RunMode {
+        +int runmode
+        +const char* name
+        +const char* description
+        +int (*RunModeFunc)(void)
+    }
+
+    class RunModes {
+        +int cnt
+        +RunMode* runmodes
+    }
+
+    class GlobalArray {
+        RunModes runmodes[RUNMODE_USER_MAX]
+    }
+
+    GlobalArray --> RunModes : 包含多个
+    RunModes --> RunMode : 包含数组
+
+    note for RunMode "存储单个自定义模式信息\n例如: single, workers, autofp"
+    note for RunModes "存储某种Runmode类型\n的所有自定义模式"
+    note for GlobalArray "全局二维数组\n索引: [Runmode类型][自定义模式]"
+```
+
+**核心数据结构定义：** [src/runmodes.c:80-94](src/runmodes.c#L80-L94)
+
+```c
+static RunModes runmodes[RUNMODE_USER_MAX];
+// runmodes[RUNMODE_AFP_DEV].runmodes[0] -> {name: "single", RunModeFunc: RunModeIdsAFPSingle}
+// runmodes[RUNMODE_AFP_DEV].runmodes[1] -> {name: "workers", RunModeFunc: RunModeIdsAFPWorkers}
+// runmodes[RUNMODE_AFP_DEV].runmodes[2] -> {name: "autofp", RunModeFunc: RunModeIdsAFPAutoFp}
+```
+
+### 8.2.3 Runmode 启动流程
+
+```mermaid
+sequenceDiagram
+    participant Main as main()
+    participant Disp as RunModeDispatch()
+    participant Get as RunModeGetCustomMode()
+    participant Func as mode->RunModeFunc()
+    participant Setup as RunModeSet***()
+    participant Thread as TmThreadCreate()
+    participant Mgmt as 管理线程创建
+
+    Main->>Disp: RunModeDispatch(runmode, custom_mode)
+
+    alt custom_mode == "auto" or NULL
+        Disp->>Disp: 获取默认模式<br/>RunModeAFPGetDefaultMode()
+    end
+
+    Disp->>Get: 查找runmode函数
+    Get-->>Disp: 返回 RunMode*
+
+    Disp->>Func: 调用 mode->RunModeFunc()
+
+    alt AF_PACKET AutoFP模式
+        Func->>Setup: RunModeIdsAFPAutoFp()
+        Setup->>Setup: RunModeSetLiveCaptureAutoFp()
+        Setup->>Thread: 创建RX线程
+        Setup->>Thread: 创建Worker线程(多个)
+    else AF_PACKET Workers模式
+        Func->>Setup: RunModeIdsAFPWorkers()
+        Setup->>Setup: RunModeSetLiveCaptureWorkers()
+        Setup->>Thread: 创建Worker线程(多个)
+    else AF_PACKET Single模式
+        Func->>Setup: RunModeIdsAFPSingle()
+        Setup->>Setup: RunModeSetLiveCaptureSingle()
+        Setup->>Thread: 创建单个线程
+    end
+
+    Disp->>Mgmt: FlowManagerThreadSpawn()
+    Disp->>Mgmt: FlowRecyclerThreadSpawn()
+    Disp->>Mgmt: BypassedFlowManagerThreadSpawn()
+    Disp->>Mgmt: StatsSpawnThreads()
+
+    Note over Main,Mgmt: 所有线程创建完成，进入运行状态
+```
+
+**关键代码位置：**
+- 调度入口：[src/runmodes.c:284-409](src/runmodes.c#L284-L409) `RunModeDispatch()`
+- AutoFP 设置：[src/util-runmodes.c:88-247](src/util-runmodes.c#L88-L247) `RunModeSetLiveCaptureAutoFp()`
+- Workers 设置：[src/util-runmodes.c:331-363](src/util-runmodes.c#L331-L363) `RunModeSetLiveCaptureWorkers()`
+- Single 设置：[src/util-runmodes.c:365-396](src/util-runmodes.c#L365-L396) `RunModeSetLiveCaptureSingle()`
+
+## 8.3 三种主要运行模式详解
+
+### 8.3.1 Single 模式 - 单线程模式
+
+**架构特点：**
+- 单个线程完成所有任务
+- 接收、解码、检测、输出全部串行执行
+- 适用于低流量场景或调试
+
+```mermaid
+flowchart TD
+    Start([开始]) --> Init[初始化线程 W#01]
+    Init --> Recv[Receive模块<br/>从网卡/文件读取数据包]
+    Recv --> Decode[Decode模块<br/>解码协议层次]
+    Decode --> Flow[FlowWorker模块<br/>流管理+检测引擎]
+    Flow --> Detect[规则匹配<br/>应用层解析]
+    Detect --> Output[RespondReject模块<br/>响应处理]
+    Output --> Check{还有数据包?}
+    Check -->|是| Recv
+    Check -->|否| End([结束])
+
+    style Init fill:#fff9c4
+    style Recv fill:#e1f5ff
+    style Decode fill:#c5e1a5
+    style Flow fill:#90caf9
+    style Detect fill:#ce93d8
+    style Output fill:#ffab91
+```
+
+**线程结构：**
+
+```mermaid
+graph LR
+    subgraph "Thread: W#01"
+        direction LR
+        A[TmSlot 1<br/>ReceivePcap/AFP] --> B[TmSlot 2<br/>DecodePcap/AFP]
+        B --> C[TmSlot 3<br/>FlowWorker]
+        C --> D[TmSlot 4<br/>RespondReject]
+    end
+
+    PacketPool[Packet Pool] -.入.-> A
+    D -.出.-> PacketPool
+
+    style A fill:#e1f5ff
+    style B fill:#c5e1a5
+    style C fill:#90caf9
+    style D fill:#ffab91
+```
+
+**实现代码位置：**
+- PCAP: [src/runmode-pcap.c:236-260](src/runmode-pcap.c#L236-L260) `RunModeIdsPcapSingle()`
+- AF_PACKET: [src/runmode-af-packet.c:170-195](src/runmode-af-packet.c#L170-L195) `RunModeIdsAFPSingle()`
+
+### 8.3.2 Workers 模式 - 多Worker独立处理
+
+**架构特点：**
+- 每个 Worker 线程独立完成全流程
+- 无需中央队列分发
+- 每个 Worker 绑定到不同的 RSS 队列或网卡
+
+```mermaid
+flowchart TB
+    subgraph Network["网络接口 / 文件"]
+        NIC[网卡 eth0<br/>RSS Queue 0-N]
+    end
+
+    subgraph Worker1["Worker Thread #01"]
+        R1[Receive] --> D1[Decode] --> F1[FlowWorker] --> O1[Respond]
+    end
+
+    subgraph Worker2["Worker Thread #02"]
+        R2[Receive] --> D2[Decode] --> F2[FlowWorker] --> O2[Respond]
+    end
+
+    subgraph Worker3["Worker Thread #03"]
+        R3[Receive] --> D3[Decode] --> F3[FlowWorker] --> O3[Respond]
+    end
+
+    subgraph WorkerN["Worker Thread #N"]
+        RN[Receive] --> DN[Decode] --> FN[FlowWorker] --> ON[Respond]
+    end
+
+    NIC -->|RSS队列0| R1
+    NIC -->|RSS队列1| R2
+    NIC -->|RSS队列2| R3
+    NIC -->|RSS队列N| RN
+
+    O1 --> Pool[Packet Pool]
+    O2 --> Pool
+    O3 --> Pool
+    ON --> Pool
+
+    style Worker1 fill:#e3f2fd
+    style Worker2 fill:#e8f5e9
+    style Worker3 fill:#fff3e0
+    style WorkerN fill:#fce4ec
+```
+
+**数据包分配机制：**
+
+```mermaid
+graph TD
+    A[网卡硬件] -->|RSS Hash| B{硬件队列分发}
+    B -->|Queue 0| W1[Worker #01]
+    B -->|Queue 1| W2[Worker #02]
+    B -->|Queue 2| W3[Worker #03]
+    B -->|Queue N| WN[Worker #N]
+
+    W1 --> P1[独立处理<br/>Flow A, B, C]
+    W2 --> P2[独立处理<br/>Flow D, E, F]
+    W3 --> P3[独立处理<br/>Flow G, H, I]
+    WN --> PN[独立处理<br/>Flow X, Y, Z]
+
+    style B fill:#ffeb3b
+    style W1 fill:#81c784
+    style W2 fill:#81c784
+    style W3 fill:#81c784
+    style WN fill:#81c784
+```
+
+**实现代码位置：**
+- 通用实现: [src/util-runmodes.c:331-363](src/util-runmodes.c#L331-L363) `RunModeSetLiveCaptureWorkers()`
+- AF_PACKET: [src/runmode-af-packet.c:140-165](src/runmode-af-packet.c#L140-L165) `RunModeIdsAFPWorkers()`
+
+**线程数量计算：**
+```c
+// src/tm-threads.c:2294-2308
+uint16_t ncpus = UtilCpuGetNumProcessorsOnline();
+int thread_max = ncpus * threading_detect_ratio; // 默认 ratio = 1.0
+// 最小值: 1, 最大值: 1024
+```
+
+### 8.3.3 AutoFP 模式 - 自动Flow负载均衡（推荐）
+
+**架构特点：**
+- 最高性能的模式
+- 接收/解码与检测分离
+- 基于 Flow Hash 的负载均衡
+- 保证同一 Flow 的数据包顺序
+
+```mermaid
+flowchart TB
+    subgraph RX["接收线程组 (RX Threads)"]
+        direction TB
+        R1[RX Thread #01<br/>ReceiveAFP]
+        R2[RX Thread #02<br/>ReceiveAFP]
+
+        R1 --> D1[DecodeAFP]
+        R2 --> D2[DecodeAFP]
+    end
+
+    subgraph FlowQ["Flow Queue Handler<br/>流哈希分发器"]
+        direction LR
+        Hash[Flow Hash计算<br/>基于五元组]
+    end
+
+    subgraph Pickup["Pickup Queues<br/>工作队列"]
+        direction LR
+        Q1[pickup1]
+        Q2[pickup2]
+        Q3[pickup3]
+        QN[pickupN]
+    end
+
+    subgraph Workers["Worker线程组 (W Threads)"]
+        direction TB
+        W1[Worker #01<br/>FlowWorker]
+        W2[Worker #02<br/>FlowWorker]
+        W3[Worker #03<br/>FlowWorker]
+        WN[Worker #N<br/>FlowWorker]
+    end
+
+    NIC[网卡接口] -->|抓包| R1
+    NIC -->|抓包| R2
+
+    D1 -->|数据包| Hash
+    D2 -->|数据包| Hash
+
+    Hash -->|Hash % N = 0| Q1
+    Hash -->|Hash % N = 1| Q2
+    Hash -->|Hash % N = 2| Q3
+    Hash -->|Hash % N = N| QN
+
+    Q1 -->|队列| W1
+    Q2 -->|队列| W2
+    Q3 -->|队列| W3
+    QN -->|队列| WN
+
+    W1 --> Pool[Packet Pool]
+    W2 --> Pool
+    W3 --> Pool
+    WN --> Pool
+
+    style RX fill:#e1f5ff
+    style FlowQ fill:#fff9c4
+    style Pickup fill:#ffccbc
+    style Workers fill:#c5e1a5
+    style Hash fill:#ffeb3b
+```
+
+**Flow Hash 分发详细流程：**
+
+```mermaid
+sequenceDiagram
+    participant RX as RX Thread
+    participant Decode as Decode Module
+    participant Hash as Flow Hash Handler
+    participant Queue as Pickup Queue
+    participant Worker as Worker Thread
+
+    RX->>RX: 从网卡接收数据包
+    RX->>Decode: 传递原始包
+    Decode->>Decode: 解码协议头<br/>(Ethernet/IP/TCP/UDP)
+    Decode->>Hash: 解码完成的Packet
+
+    Hash->>Hash: 计算Flow Hash<br/>hash = Hash(src_ip, dst_ip,<br/>src_port, dst_port, proto)
+    Hash->>Hash: queue_id = hash % worker_count
+
+    alt queue_id == 0
+        Hash->>Queue: 入队 pickup1
+        Queue->>Worker: Worker #01 取包
+    else queue_id == 1
+        Hash->>Queue: 入队 pickup2
+        Queue->>Worker: Worker #02 取包
+    else queue_id == N
+        Hash->>Queue: 入队 pickupN
+        Queue->>Worker: Worker #N 取包
+    end
+
+    Worker->>Worker: FlowWorker 处理<br/>流管理+检测+输出
+    Worker->>Worker: 释放到 Packet Pool
+```
+
+**AutoFP 线程 CPU 亲和性：**
+
+```mermaid
+graph TB
+    subgraph CPU["CPU 核心分配"]
+        C1[CPU Core 0-N]
+        C2[CPU Core N+1-M]
+        C3[CPU Core M+1-K]
+    end
+
+    RX[RX Threads] -.绑定.-> C1
+    RX -.RECEIVE_CPU_SET.-> C1
+
+    Workers[Worker Threads] -.绑定.-> C2
+    Workers -.WORKER_CPU_SET.-> C2
+
+    Mgmt[Management Threads<br/>FM/FR/FB] -.绑定.-> C3
+    Mgmt -.MANAGEMENT_CPU_SET.-> C3
+
+    style C1 fill:#e1f5ff
+    style C2 fill:#c5e1a5
+    style C3 fill:#ffccbc
+```
+
+**Flow 哈希调度器配置：**
+
+```yaml
+# suricata.yaml
+autofp-scheduler: hash    # 默认，基于五元组哈希
+# autofp-scheduler: ippair  # 基于IP对哈希
+# autofp-scheduler: active-packets  # 已废弃，转为hash
+```
+
+**实现代码位置：**
+- 通用实现: [src/util-runmodes.c:88-247](src/util-runmodes.c#L88-L247) `RunModeSetLiveCaptureAutoFp()`
+- Flow Handler: [src/tmqh-flow.c:210-245](src/tmqh-flow.c#L210-L245) `TmqhOutputFlowHash()`
+- Queue 创建: [src/util-runmodes.c:57-84](src/util-runmodes.c#L57-L84) `RunmodeAutoFpCreatePickupQueuesString()`
+
+**AutoFP 优势总结：**
+1. **高吞吐量**：接收和检测分离，避免瓶颈
+2. **负载均衡**：Hash 算法自动分配负载
+3. **Flow 一致性**：同一 Flow 的包发送到同一 Worker
+4. **可扩展性**：Worker 数量可根据 CPU 核心数动态调整
+
+
+
+## 8.5 线程管理详解
+
+### 8.5.1 ThreadVars 生命周期
+
+```mermaid
+stateDiagram-v2
+    [*] --> Created: TmThreadCreate()
+    Created --> Initialized: TmSlotSetFuncAppend()<br/>添加模块到槽位
+    Initialized --> CPUSet: TmThreadSetCPU()<br/>设置CPU亲和性
+    CPUSet --> Spawned: TmThreadSpawn()<br/>创建pthread
+
+    Spawned --> InitDone: 线程初始化完成<br/>THV_INIT_DONE
+    InitDone --> Running: TmThreadContinueThreads()<br/>THV_USE
+
+    Running --> Paused: THV_PAUSE信号
+    Paused --> Running: 恢复运行
+
+    Running --> Stopping: THV_KILL信号
+    Stopping --> Deinit: THV_DEINIT<br/>清理资源
+    Deinit --> Closed: THV_CLOSED<br/>可join
+    Closed --> Dead: pthread_join()<br/>THV_DEAD
+    Dead --> [*]
+```
+
+**ThreadVars 关键字段：**
+
+```mermaid
+classDiagram
+    class ThreadVars {
+        +pthread_t t
+        +char name[16]
+        +char* printable_name
+        +uint8_t type
+        +uint16_t cpu_affinity
+        +Tmq* inq
+        +Tmq* outq
+        +Packet* (*tmqh_in)(ThreadVars*)
+        +void (*tmqh_out)(ThreadVars*, Packet*)
+        +TmSlot* tm_slots
+        +void* (*tm_func)(void*)
+        +uint32_t flags
+    }
+
+    class TmSlot {
+        +TmSlotFunc SlotFunc
+        +TmEcode (*PktAcqLoop)(...)
+        +TmSlot* slot_next
+        +void* slot_data
+        +int tm_id
+    }
+
+    class Tmq {
+        +char* name
+        +PacketQueue* pq
+    }
+
+    ThreadVars --> TmSlot : tm_slots链表
+    ThreadVars --> Tmq : inq/outq
+    TmSlot --> TmSlot : slot_next
+```
+
+**定义位置：** [src/threadvars.h:59-100](src/threadvars.h#L59-L100)
+
+### 8.5.2 TmSlot 处理流程
+
+```mermaid
+flowchart TD
+    Start([线程启动]) --> FuncCheck{检查 tm_func}
+
+    FuncCheck -->|pktacqloop| PktLoop[TmThreadsSlotPktAcqLoop]
+    FuncCheck -->|varslot| VarSlot[TmThreadsSlotVar]
+    FuncCheck -->|management| Mgmt[TmThreadsManagement]
+
+    PktLoop --> AcqLoop[slot->PktAcqLoop执行]
+    AcqLoop -->|获取数据包| ProcessPkt[TmThreadsSlotProcessPkt]
+
+    ProcessPkt --> SlotRun[TmThreadsSlotVarRun]
+
+    SlotRun --> Traverse{遍历 tm_slots}
+    Traverse -->|有下一个Slot| Execute[执行 slot->SlotFunc]
+    Execute -->|Receive| RecvFunc[ReceiveAFP/Pcap]
+    Execute -->|Decode| DecodeFunc[DecodeAFP/Pcap]
+    Execute -->|FlowWorker| FlowFunc[FlowWorker]
+    Execute -->|Respond| RespondFunc[RespondReject]
+
+    RecvFunc --> Traverse
+    DecodeFunc --> Traverse
+    FlowFunc --> Traverse
+    RespondFunc --> Traverse
+
+    Traverse -->|无下一个Slot| Output[tmqh_out输出]
+    Output --> AcqLoop
+
+    AcqLoop -->|收到退出信号| Cleanup[清理资源]
+    Cleanup --> End([线程结束])
+
+    style PktLoop fill:#e1f5ff
+    style SlotRun fill:#c5e1a5
+    style Execute fill:#fff9c4
+    style Traverse fill:#ffccbc
+```
+
+**关键代码位置：**
+- Slot 执行: [src/tm-threads.c:3500-3560](src/tm-threads.c#L3500-L3560) `TmThreadsSlotVarRun()`
+- Packet 处理: [src/tm-threads.c:3430-3490](src/tm-threads.c#L3430-L3490) `TmThreadsSlotProcessPkt()`
+- 抓包循环: [src/tm-threads.c:3240-3360](src/tm-threads.c#L3240-L3360) `TmThreadsSlotPktAcqLoop()`
+
+
+
+## 8.6 队列管理系统
+
+### 8.6.1 队列处理器类型
+
+```mermaid
+graph TB
+    subgraph QueueHandlers["队列处理器 (Tmqh)"]
+        A[TMQH_SIMPLE<br/>简单队列]
+        B[TMQH_PACKETPOOL<br/>数据包池]
+        C[TMQH_FLOW<br/>Flow分发队列]
+    end
+
+    A --> A1[InHandler: TmqhInputSimple<br/>OutHandler: TmqhOutputSimple]
+    B --> B1[InHandler: TmqhInputPacketpool<br/>OutHandler: TmqhOutputPacketpool]
+    C --> C1[InHandler: TmqhInputFlow<br/>OutHandler: TmqhOutputFlowHash]
+
+    A1 --> U1[用途: 简单队列传递<br/>单生产者单消费者]
+    B1 --> U2[用途: 数据包内存池<br/>复用Packet结构]
+    C1 --> U3[用途: AutoFP模式<br/>Flow哈希负载均衡]
+
+    style A fill:#e1f5ff
+    style B fill:#c5e1a5
+    style C fill:#fff9c4
+```
+
+**定义位置：**
+- Tmqh 结构: [src/tm-queuehandlers.h:27-43](src/tm-queuehandlers.h#L27-L43)
+- Simple: [src/tmqh-simple.c](src/tmqh-simple.c)
+- Packetpool: [src/tmqh-packetpool.c](src/tmqh-packetpool.c)
+- Flow: [src/tmqh-flow.c](src/tmqh-flow.c)
+
+### 8.6.2 Flow Queue Handler 详解
+
+```mermaid
+flowchart TB
+    subgraph FlowCtx["TmqhFlowCtx 上下文"]
+        direction TB
+        Size[size: Worker数量]
+        Last[last: 上次使用的队列]
+        Queues[queues: TmqhFlowMode数组]
+    end
+
+    subgraph FlowMode["TmqhFlowMode * N"]
+        direction LR
+        Q1[Queue 1: pickup1]
+        Q2[Queue 2: pickup2]
+        Q3[Queue 3: pickup3]
+        QN[Queue N: pickupN]
+    end
+
+    subgraph HashCalc["Hash 计算"]
+        direction TB
+        Pkt[Packet] --> Extract[提取五元组]
+        Extract --> SrcIP[src_ip]
+        Extract --> DstIP[dst_ip]
+        Extract --> SrcPort[src_port]
+        Extract --> DstPort[dst_port]
+        Extract --> Proto[protocol]
+
+        SrcIP --> HashFunc[Hash函数]
+        DstIP --> HashFunc
+        SrcPort --> HashFunc
+        DstPort --> HashFunc
+        Proto --> HashFunc
+
+        HashFunc --> Mod[hash % size]
+        Mod --> Index[队列索引]
+    end
+
+    FlowCtx --> FlowMode
+    HashCalc --> Index
+    Index -->|索引0| Q1
+    Index -->|索引1| Q2
+    Index -->|索引2| Q3
+    Index -->|索引N| QN
+
+    style HashFunc fill:#ffeb3b
+    style Mod fill:#ff9800
+```
+
+**Flow Hash 核心代码：** [src/tmqh-flow.c:210-245](src/tmqh-flow.c#L210-L245)
+
+```c
+void TmqhOutputFlowHash(ThreadVars *t, Packet *p) {
+    uint32_t hash = p->flow_hash;  // 五元组哈希值
+    TmqhFlowCtx *ctx = (TmqhFlowCtx *)t->outctx;
+    uint32_t idx = hash % ctx->size;  // 取模得到队列索引
+
+    PacketQueue *q = ctx->queues[idx].q;
+    PacketEnqueue(q, p);  // 入队到对应的 pickup 队列
+}
+```
+
+### 8.6.3 队列创建与绑定
+
+```mermaid
+sequenceDiagram
+    participant A as RunModeSetLiveCaptureAutoFp
+    participant B as CreatePickupQueues
+    participant C as TmThreadCreate
+    participant D as QueueManager
+
+    A->>B: 1. 计算worker数量
+    Note over B: 生成队列名称<br/>pickup1,pickup2,...,pickupN
+    B-->>A: 2. 返回队列名字符串
+
+    loop 为每个Worker创建线程
+        A->>C: 3. 创建Worker线程
+        Note over C: inq_name = pickupX
+        C->>D: 4. TmqGetQueueByName(pickupX)
+
+        alt 队列已存在
+            D-->>C: 返回已有队列
+        else 队列不存在
+            D->>D: 5. TmqCreateQueue(pickupX)
+            D->>D: 6. 添加到tmq_list链表
+            D-->>C: 返回新队列
+        end
+
+        C->>C: 7. tv->inq = queue
+        C->>C: 8. tv->tmqh_in = TmqhInputFlow
+    end
+
+    Note over A,D: 队列懒加载创建机制<br/>全局链表tmq_list存储所有队列
+```
+
+**代码位置：**
+- 队列字符串生成: [src/util-runmodes.c:57-84](src/util-runmodes.c#L57-L84) `RunmodeAutoFpCreatePickupQueuesString()`
+- 队列查找/创建: [src/tm-queues.c](src/tm-queues.c) `TmqGetQueueByName()`, `TmqCreateQueue()`
+
+## 8.7 完整启动流程综合图
+
+```mermaid
+flowchart TD
+    Start([Suricata 启动]) --> ParseConfig[解析配置文件]
+    ParseConfig --> PostSetup[PostConfLoadedSetup]
+
+    subgraph Registration["注册阶段"]
+        RegModules[RegisterAllModules<br/>注册所有模块到tmm_modules]
+        RegRunmodes[RunModeRegisterRunModes<br/>注册所有运行模式]
+        SetupQH[TmqhSetup<br/>注册队列处理器]
+    end
+
+    PostSetup --> RegModules
+    RegModules --> RegRunmodes
+    RegRunmodes --> SetupQH
+
+    SetupQH --> Dispatch[RunModeDispatch]
+
+    subgraph DispatchPhase["调度阶段"]
+        GetMode[获取Custom Mode<br/>默认或配置指定]
+        LookupFunc[查找RunModeFunc<br/>从runmodes数组]
+        CallFunc[调用RunModeFunc]
+    end
+
+    Dispatch --> GetMode
+    GetMode --> LookupFunc
+    LookupFunc --> CallFunc
+
+    subgraph ThreadCreation["线程创建阶段"]
+        direction TB
+        CreateRX[创建RX线程<br/>AutoFP模式]
+        CreateWorkers[创建Worker线程]
+        CreateMgmt[创建管理线程<br/>FM/FR/FB/Stats]
+    end
+
+    CallFunc -->|AutoFP| CreateRX
+    CallFunc -->|Workers/Single| CreateWorkers
+    CreateRX --> CreateWorkers
+    CreateWorkers --> CreateMgmt
+
+    subgraph ThreadInit["线程初始化"]
+        direction TB
+        WaitInit[TmThreadWaitOnThreadInit<br/>等待所有线程初始化]
+        SetRuntime[设置运行状态<br/>SURICATA_RUNTIME]
+        Continue[TmThreadContinueThreads<br/>唤醒所有线程]
+    end
+
+    CreateMgmt --> WaitInit
+    WaitInit --> SetRuntime
+    SetRuntime --> Continue
+
+    Continue --> MainLoop[SuricataMainLoop<br/>主循环]
+    MainLoop --> Running([运行中...])
+
+    style Registration fill:#e1f5ff
+    style DispatchPhase fill:#c5e1a5
+    style ThreadCreation fill:#fff9c4
+    style ThreadInit fill:#ffccbc
+```
+
+## 8.8 性能调优建议
+
+### 8.8.1 配置参数优化
+
+```yaml
+# suricata.yaml 优化建议
+
+# 1. 线程配置
+threading:
+  set-cpu-affinity: yes
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [ 0 ]  # 管理线程独占CPU 0
+    - receive-cpu-set:
+        cpu: [ 1, 2 ]  # RX线程使用CPU 1-2
+    - worker-cpu-set:
+        cpu: [ 3-15 ]  # Worker线程使用CPU 3-15
+  detect-thread-ratio: 1.0  # Worker数 = CPU核心数 * ratio
+
+# 2. AutoFP 配置
+autofp-scheduler: hash  # 使用哈希调度（推荐）
+
+# 3. AF_PACKET 优化
+af-packet:
+  - interface: eth0
+    threads: auto  # 自动检测RSS队列数
+    cluster-type: cluster_flow  # Flow级别分发
+    defrag: yes
+    use-mmap: yes
+    ring-size: 20000  # 增大环形缓冲区
+    block-size: 32768
+```
+
+### 8.8.2 性能对比
+
+| 模式 | 吞吐量 | CPU利用率 | 内存占用 | 复杂度 | 适用场景 |
+|------|--------|-----------|----------|--------|----------|
+| **Single** | 低 (100-200 Mbps) | 单核100% | 低 | 低 | 调试、低流量 |
+| **Workers** | 中-高 (1-5 Gbps) | 多核均衡 | 中 | 中 | 通用场景 |
+| **AutoFP** | 高 (5-10+ Gbps) | 多核优化 | 中-高 | 高 | 高性能生产环境 |
+
+## 8.9 调试技巧
+
+### 8.9.1 查看当前运行模式
+
+```bash
+# 查看支持的运行模式
+suricata --list-runmodes
+
+# 启动时指定运行模式
+suricata -c suricata.yaml -i eth0 --runmode=autofp
+```
+
+### 8.9.2 GDB 调试断点建议
+
+```bash
+# 关键断点位置
+b RunModeDispatch              # 运行模式调度
+b RunModeSetLiveCaptureAutoFp  # AutoFP设置
+b TmThreadCreate               # 线程创建
+b TmThreadsSlotVarRun          # Slot执行
+b TmqhOutputFlowHash           # Flow哈希分发
+b ReceiveAFPLoop               # AF_PACKET接收循环
+b FlowWorker                   # FlowWorker处理
+```
+
+
+
+---
+
+## 8.10 总结
+
+Suricata 的 Runmode 系统是其高性能架构的核心，通过灵活的运行模式和线程模型，能够适应从低流量调试到高性能生产环境的各种场景：
+
+1. **架构设计**：模块化的线程-槽位-模块结构，支持灵活组合
+2. **运行模式**：Single、Workers、AutoFP 三种模式满足不同需求
+3. **负载均衡**：AutoFP 模式的 Flow Hash 实现智能负载分配
+5. **性能优化**：CPU 亲和性、队列管理、RSS 硬件加速
+
+通过深入理解 Runmode 系统，可以更好地配置和优化 Suricata，充分发挥其检测能力和性能潜力。
 

@@ -130,7 +130,15 @@ https://cursor.zone/faq/how-to-use-cursor-memory-bank.html
 
 
 
-陈天
+**梳理数据结构关系图**
+
+![image-20251023103334881](./picture/image-20251023103334881.png)
+
+所有的提示词都在specs/instructions/目录下
+
+"现在请根据代码库，研究Workflow是怎么运行的，请创建新的文件specs/execution.md详细介绍运行流程，并使用mermaid绘制flow diagram，sequential diagram等图标清晰的帮助我理解zfw的workflow"
+
+**这块的重点是使用mermaid来绘制流程图和序列图来帮助我们理解项目的逻辑。**
 
 
 

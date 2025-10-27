@@ -578,8 +578,6 @@ master和worker之间的通信机制如下图所示：
 
 **4、多进程支持**
 
-**5、内存池**
-
 
 
 # 三、CPU Packet Processing数据包处理

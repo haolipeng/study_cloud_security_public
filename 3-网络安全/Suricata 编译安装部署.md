@@ -16,7 +16,7 @@ https://www.cnblogs.com/UnGeek/p/5796934.html
 
 
 
-参考文档：https://docs.suricata.io/en/latest/devguide/codebase/installation-from-git.html
+
 
 # 零、预安装要求
 
@@ -308,13 +308,17 @@ SC_LOG_LEVEL=Debug suricata -u
 
 
 
+## 2、3 suricata.yaml配置文件
 
 
-# 三、容器化方式部署suricata
 
-以容器化的方式来启动suricata程序。
 
-```
-docker run --rm -it --net=host --cap-add=net_admin --cap-add=net_raw --cap-add=sys_nice -v $(pwd)/logs:/var/log/suricata jasonish/suricata:latest -i ens34
-```
+
+# 三、debug单步调试环境
+
+
+
+# 四、参考链接
+
+参考文档：https://docs.suricata.io/en/latest/devguide/codebase/installation-from-git.html
 

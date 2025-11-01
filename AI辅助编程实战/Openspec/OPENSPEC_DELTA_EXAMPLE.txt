@@ -1,0 +1,110 @@
+═══════════════════════════════════════════════════════════════════
+  Delta（增量） vs Complete Spec（完整规范）示例
+═══════════════════════════════════════════════════════════════════
+
+场景：添加控制平面API
+
+┌─────────────────────────────────────────────────────────────────┐
+│ changes/add-control-plane-api/specs/control-plane-api/spec.md  │
+│ (这是增量 - Delta)                                              │
+└─────────────────────────────────────────────────────────────────┘
+
+## ADDED Requirements                    ← 注意这个标记
+
+### Requirement: HTTP API Server
+The system SHALL provide an HTTP API server...
+
+#### Scenario: API server starts successfully
+- WHEN the agent starts with API enabled
+- THEN the HTTP server MUST listen on port 8080
+
+### Requirement: Policy Management Endpoints
+The API SHALL provide RESTful endpoints...
+
+#### Scenario: Create policy via API
+- WHEN POST /api/v1/policies with valid JSON
+- THEN return 201 Created
+
+... (共14个需求)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+执行 archive 后：
+
+┌─────────────────────────────────────────────────────────────────┐
+│ specs/control-plane-api/spec.md                                 │
+│ (这是完整规范 - Complete Spec)                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+# Capability: Control Plane API          ← 没有ADDED标记
+
+### Requirement: HTTP API Server         ← 直接是需求
+The system SHALL provide an HTTP API server...
+
+#### Scenario: API server starts successfully
+- WHEN the agent starts with API enabled
+- THEN the HTTP server MUST listen on port 8080
+
+### Requirement: Policy Management Endpoints
+The API SHALL provide RESTful endpoints...
+
+#### Scenario: Create policy via API
+- WHEN POST /api/v1/policies with valid JSON
+- THEN return 201 Created
+
+... (所有14个需求都在这里，没有ADDED/MODIFIED标记)
+
+═══════════════════════════════════════════════════════════════════
+  如果下次要修改这个功能
+═══════════════════════════════════════════════════════════════════
+
+创建新提案: changes/update-control-plane-api/
+
+┌─────────────────────────────────────────────────────────────────┐
+│ changes/update-control-plane-api/specs/control-plane-api/spec.md│
+└─────────────────────────────────────────────────────────────────┘
+
+## ADDED Requirements                    ← 新增需求
+
+### Requirement: Authentication Support
+The API SHALL support JWT token authentication...
+
+## MODIFIED Requirements                 ← 修改需求
+
+### Requirement: HTTP API Server         ← 完整重写这个需求
+The system SHALL provide an HTTPS API server...  (改成HTTPS)
+
+#### Scenario: API server starts with TLS
+- WHEN the agent starts with API enabled
+- THEN the HTTPS server MUST listen on port 8443
+
+## REMOVED Requirements                  ← 删除需求
+
+### Requirement: Some Old Feature
+**Reason**: No longer needed
+**Migration**: Use new feature instead
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Archive 后，specs/control-plane-api/spec.md 会变成：
+
+┌─────────────────────────────────────────────────────────────────┐
+│ specs/control-plane-api/spec.md (更新后的完整规范)              │
+└─────────────────────────────────────────────────────────────────┘
+
+### Requirement: HTTPS API Server        ← 已修改
+The system SHALL provide an HTTPS API server...
+
+#### Scenario: API server starts with TLS
+- WHEN the agent starts with API enabled
+- THEN the HTTPS server MUST listen on port 8443
+
+### Requirement: Authentication Support  ← 已新增
+The API SHALL support JWT token authentication...
+
+### Requirement: Policy Management Endpoints  ← 未改动
+The API SHALL provide RESTful endpoints...
+
+(旧功能已删除)
+
+═══════════════════════════════════════════════════════════════════

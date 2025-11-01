@@ -1,0 +1,73 @@
+══════════════════════════════════════════════════════════════════
+  OpenSpec 目录结构 - 快速参考
+══════════════════════════════════════════════════════════════════
+
+问题 1: proposal.md, design.md, tasks.md 放哪里？
+答案：放在 changes/[change-id]/ 目录下
+
+  openspec/changes/add-control-plane-api/
+  ├── proposal.md      ✅ 这里
+  ├── design.md        ✅ 这里
+  ├── tasks.md         ✅ 这里
+  └── specs/           ← spec增量（delta）
+      └── [capability]/
+          └── spec.md  ✅ 这里
+
+══════════════════════════════════════════════════════════════════
+
+问题 2: openspec/specs/ 目录是干什么的？
+答案：存储系统的"当前真相" - 已实现功能的完整规范
+
+  openspec/specs/                    ← 真相源
+  └── control-plane-api/
+      └── spec.md                    ← 完整规范（无ADDED/MODIFIED）
+
+  只有执行 archive 命令后才会创建/更新
+  
+══════════════════════════════════════════════════════════════════
+
+三个目录的区别：
+
+┌─────────────────┬──────────────────┬────────────────────┐
+│ 目录            │ 含义             │ 何时使用           │
+├─────────────────┼──────────────────┼────────────────────┤
+│ changes/        │ 工作区（提案）   │ proposal/apply时   │
+│ specs/          │ 真相（完整规范） │ archive后自动生成  │
+│ archive/        │ 历史库           │ archive后移动到此  │
+└─────────────────┴──────────────────┴────────────────────┘
+
+══════════════════════════════════════════════════════════════════
+
+完整流程：
+
+1. Proposal:  创建 changes/[change-id]/
+              ├── proposal.md
+              ├── design.md
+              ├── tasks.md
+              └── specs/[capability]/spec.md (增量)
+
+2. Apply:     位置不变，在 changes/[change-id]/
+              按 tasks.md 实施，更新 checkbox
+
+3. Archive:   移动 proposal/design/tasks → archive/
+              合并 spec增量 → specs/[capability]/spec.md
+
+══════════════════════════════════════════════════════════════════
+
+核心理解：
+
+changes/ 下的 specs/ = 增量（有 ADDED/MODIFIED/REMOVED）
+specs/ 下的 spec.md = 完整（没有 ADDED/MODIFIED标记）
+
+archive 命令会自动合并增量到完整规范！
+
+══════════════════════════════════════════════════════════════════
+
+常用命令：
+
+openspec list                           # 查看活动变更
+openspec list --specs                   # 查看完整规范
+openspec validate [change-id] --strict  # 验证提案
+openspec archive [change-id] --yes      # 归档并合并
+
+══════════════════════════════════════════════════════════════════

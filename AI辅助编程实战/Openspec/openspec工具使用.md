@@ -175,3 +175,41 @@ Document the existing network traffic monitoring capabilities...
    - Code review：这个功能当时为什么要这样设计？
    - 回溯历史：某个 requirement 是什么时候加入的？
    - 审计追踪：所有变更都有完整的 proposal、tasks、design 文档
+
+
+
+了解项目当前状况：
+
+List existing OpenSpec changes
+
+```
+openspec list
+Changes:
+  add-database-migration-tools        No tasks
+  add-docker-deployment               0/202 tasks
+  add-kubernetes-deployment           0/217 tasks
+  add-server-production-hardening     0/126 tasks
+```
+
+List existing specs
+
+```
+openspec list --specs
+Specs:
+  agent-management-ui       requirements 5
+  control-plane-api         requirements 16
+  dataplane-performance     requirements 11
+  flow-analytics-ui         requirements 10
+  flow-management           requirements 17
+  label-management          requirements 13
+  policy-enforcement        requirements 10
+  policy-management         requirements 21
+  policy-management-ui      requirements 12
+  policy-matching           requirements 17
+  session-tracking          requirements 7
+  statistics-reporting      requirements 11
+  systemd-deployment        requirements 11
+  web-ui-foundation         requirements 1
+  web-ui-visualization      requirements 14
+```
+

@@ -5,7 +5,7 @@
 将开源项目的代码转换为另一种语言时，关键步骤：
 
 1. **需求梳理**：让 Cursor 读取源码并梳理项目需求
-2. **设计文档生成**：基于源码和需求生成详细的设计文档
+2. **设计文档生成**：基于源码和需求生成详细的架构设计文档
 
 
 
@@ -15,13 +15,14 @@
 
 
 
-### 1.2 设计文档内容要求
+### 1.2 架构设计文档内容要求
 
 - **数据结构**：核心数据结构定义
 - **流程图**：使用 Mermaid 格式绘制
 - **依赖库选择**：明确原项目使用的库，以及目标语言的对应库
 - **架构设计**：整体架构和模块关系
 - **独特性**：使用的编程语言不同，提供的特性也不同
+- **技术栈：**使用了语言的特有架构，es，middleware
 
 
 
@@ -35,8 +36,8 @@
 ### 2.1 项目准备
 
 1. 使用合适的项目模板（如 rust-lib-template）
-2. 将待分析的开源项目导入到项目中
-3. 将开源项目路径添加到 `.gitignore` 文件
+2. 将待分析的开源项目下载完成并导入到项目中
+3. 将开源项目路径添加到 .gitignore 文件
 
 ### 2.2 核心提示词模板
 
@@ -47,6 +48,19 @@ Please look into @/[项目路径], examine every [语言] file (except *_test.[�
 2. the [目标语言] design doc: generate relevant data structure, trait. Also the design charts using mermaid. Make sure you use latest [相关库]. Please follow @[规则文件路径]
 ```
 
+
+
+https://github.com/stamparm/maltrail项目是采用python实现的恶意流量检测系统，
+
+```
+Please look into @/maltrail, examine every python file (except *_test.py), and learn the arch & design of the software. Then based on your learnings, generate two files under ./specs:
+
+1. the product requirement doc: list all the features maltrail supports, and their detailed explanation and usage.
+2. the go design doc: generate relevant go data structure, interface. Also the design charts using mermaid. Make sure you use latest golang thirdpart library,such as gopacket.
+```
+
+
+
 ### 2.3 实际案例：grpcurl 项目分析
 
 **输入给cursor：**
@@ -55,7 +69,7 @@ Please look into @/[项目路径], examine every [语言] file (except *_test.[�
 Please look into @/grpcurl , examine every go file (except *_test.go), and learn the arch & design of the software. Then based on your learnings, generate two files under ./specs:
 
 1. the product requirement doc: list all the features grpcurl supports, and their detailed explanation and usage.
-2. the rust design doc: generate relevant(相关的) rust data structure, trait. Also the design charts using mermaid. Make sure you use latest clap and tonic / tonic-reflection. Please follow @rust/core/design-patterns.mdc @rust/core/code-quality.mdc @dependencies.mdc @rust/core/type-system.mdc
+2. the rust design doc: generate relevant rust data structure, trait. Also the design charts using mermaid. Make sure you use latest clap and tonic / tonic-reflection. Please follow @rust/core/design-patterns.mdc @rust/core/code-quality.mdc @dependencies.mdc @rust/core/type-system.mdc
 ```
 
 **cursor输出的结果：**

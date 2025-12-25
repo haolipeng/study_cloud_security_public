@@ -1,6 +1,8 @@
+AI编程训练营
+
 https://github.com/tyrchen/geektime-bootcamp-ai
 
- 
+
 
 # 课程大纲
 

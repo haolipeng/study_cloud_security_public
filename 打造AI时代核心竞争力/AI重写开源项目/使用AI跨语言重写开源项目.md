@@ -61,6 +61,16 @@ Please look into @/maltrail, examine every python file (except *_test.py), and l
 
 
 
+翻译为中文提示词就是如此：
+
+```
+作为swift和golang语言的专家，你检查下所有的swift类型的文件，然后学习quotio的架构设计。然后基于你的学习，在./specs目录下生成两种文件
+1、产品需求文档：列出quotio的所有功能列表，包括它的详细说明和使用示例。
+2、将它重写为golang项目的设计文档：生成相关的数据结构、结构体和接口的鞥。另外，用 Mermaid 画出设计图表。务必使用最恰当的和最新版本的相关库
+```
+
+
+
 ### 2.3 实际案例：grpcurl 项目分析
 
 **输入给cursor：**

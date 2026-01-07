@@ -1,3 +1,34 @@
+我参与的开源项目中的flow-monitor功能
+
+https://github.com/aiclientproxy/flow-monitor
+
+
+
+**先安装jsbeautifier才能使用js-beautify命令**
+
+apt install jsbeautifier
+
+
+
+查看claude code的路径
+
+```
+root@ubuntu:/home/work# which claude
+/opt/node-v22.20.0/bin/claude
+```
+
+
+
+# Datadog LLM Observability
+
+https://www.datadoghq.com/dg/llm/llm-observability/?utm_source=google&utm_medium=paid-search&utm_campaign=dg-infra-na-llm-observability&utm_keyword=ai%20model%20observability&utm_matchtype=p&igaag=167022056816&igaat=&igacm=15822835191&igacr=711263744060&igakw=ai%20model%20observability&igamt=p&igant=g&utm_campaignid=15822835191&utm_adgroupid=167022056816&gad_source=1&gad_campaignid=15822835191&gbraid=0AAAAADFY9Nl4fBulaWGXlvMxu2a7riwfZ&gclid=CjwKCAiA3-3KBhBiEiwA2x7FdFFTa8Og8H4lfe7zo9VbHo-MFEYQXrXso-WvWsdP1TLTrSgYDhxB_BoCqtgQAvD_BwE
+
+
+
+
+
+
+
 好消息！你的机器上已经正确安装了 Visual Studio Build Tools，包括所有必需组件：
 
   已安装的组件：

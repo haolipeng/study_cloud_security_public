@@ -1,0 +1,6 @@
+{
+	"ctrl_cfg_mac": {
+		"macs": ["00:0c:29:87:a4:02"],
+		"tap": false
+	}
+}

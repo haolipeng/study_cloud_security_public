@@ -1,0 +1,23 @@
+{
+	"ctrl_cfg_dlp": {
+		"flag": 3,
+		"mac": ["00:0c:29:87:a4:02"],
+		"dlp_rule_names": [],
+		"waf_rule_names": [{
+			"id": 40002,
+			"action": 1
+		}, {
+			"id": 40003,
+			"action": 1
+		}, {
+			"id": 40000,
+			"action": 1
+		}, {
+			"id": 40001,
+			"action": 1
+		}],
+		"rule_ids": null,
+		"waf_rule_ids": null,
+		"ruletype": "wafinside"
+	}
+}

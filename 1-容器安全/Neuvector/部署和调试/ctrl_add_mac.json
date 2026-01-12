@@ -1,0 +1,11 @@
+{
+	"ctrl_add_mac": {
+		"iface": "vth-neuv",
+		"mac": "00:0c:29:87:a4:02",
+		"ucmac": "",
+		"bcmac": "",
+		"oldmac": "",
+		"pmac": "",
+		"pips": null
+	}
+}

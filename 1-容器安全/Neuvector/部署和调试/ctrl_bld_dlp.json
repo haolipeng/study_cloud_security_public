@@ -1,0 +1,25 @@
+{
+	"ctrl_bld_dlp": {
+		"flag": 3,
+		"dir": 1,
+		"dlp_rules": [{
+			"name": "haolipeng_nVwAfCtR.haolipeng-rule",
+			"id": 40002,
+			"patterns": ["/\\$\\{((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[jJ](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[nN](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[dD](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[iI])((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\}|\\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*/is; context packet"]
+		}, {
+			"name": "haolipeng_nVwAfCtR.zhuzhe-rule",
+			"id": 40003,
+			"patterns": ["/\\$\\{((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[jJ](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[nN](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[dD](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[iI])((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\}|\\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*/is; context packet"]
+		}, {
+			"name": "sensor.log4shell_nVwAfCtR.rule.log4shell",
+			"id": 40000,
+			"patterns": ["/\\$\\{((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[jJ](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[nN](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[dD](\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\})*[iI])((\\$|\\{|lower|upper|[a-zA-Z]|\\:|\\-|\\}|\\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*/is; context header"]
+		}, {
+			"name": "sensor.spring4shell_nVwAfCtR.rule.spring4shell",
+			"id": 40001,
+			"patterns": ["\$\{((\$|\{|lower|upper|[a-zA-Z]|\:|\-|\})*[jJ](\$|\{|lower|upper|[a-zA-Z]|\:|\-|\})*[nN](\$|\{|lower|upper|[a-zA-Z]|\:|\-|\})*[dD](\$|\{|lower|upper|[a-zA-Z]|\:|\-|\})*[iI])((\$|\{|lower|upper|[a-zA-Z]|\:|\-|\}|\/)|[ldapLDAPrmiRMInsNShtHTcobCOB])*.*"]
+		}],
+		"mac": ["00:0c:29:87:a4:02"],
+		"delmac": []
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"ctrl_cfg_policy": {
+		"cmd": 1,
+		"flag": 3,
+		"defact": 1,
+		"dir": 1,
+		"mac": ["00:0c:29:87:a4:02"],
+		"rules": null
+	}
+}

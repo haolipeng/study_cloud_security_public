@@ -131,11 +131,11 @@ vbr-neuv和vth-neuv接口分别起到什么作用？
 
 重新计算各种mac地址的含义
 
-![image-20220712191953437](picture/image-20220712191953437.png)
+![image-20220712191953437](https://gitee.com/codergeek/picgo-image/raw/master/image/202601122201285.png)
 
-![image-20220712192012539](picture/image-20220712192012539.png)
+![image-20220712192012539](https://gitee.com/codergeek/picgo-image/raw/master/image/202601122201990.png)
 
-![image-20220712192038988](picture/image-20220712192038988.png)
+![image-20220712192038988](https://gitee.com/codergeek/picgo-image/raw/master/image/202601122201433.png)
 
 pair.MAC
 
@@ -586,7 +586,7 @@ Neuvector关闭protect保护模式时，会调用DPCtrlDelSrvcPort函数
 
 对于数据流程的分析
 
-![image-20220524143021751](picture/image-20220524143021751.png)
+![image-20220524143021751](https://gitee.com/codergeek/picgo-image/raw/master/image/202601122200711.png)
 
 本质：用tc模拟出所有流量的镜像。
 

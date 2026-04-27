@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "每日读书/从内耗到心流.md",
+                "file": "ebpf-microsegmentation-best-practices.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "从内耗到心流"
+              "title": "ebpf-microsegmentation-best-practices"
             }
           }
         ]
@@ -166,8 +166,9 @@
       "command-palette:打开命令面板": false
     }
   },
-  "active": "5ab8e6feec4ef8f3",
+  "active": "4a31de17eded0e11",
   "lastOpenFiles": [
+    "每日读书/从内耗到心流.md",
     "每日读书/1-只管去做(已完结).md",
     "2-dpdk/DPDK学习大纲-技术分享版.md",
     "2-dpdk/picture/image-20250716102831065.png",

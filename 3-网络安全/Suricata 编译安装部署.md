@@ -1,23 +1,3 @@
-现在未搞清楚的一些事情。
-
-suricata的配置文件字段说明
-
-https://www.cnblogs.com/UnGeek/p/5796934.html
-
-
-
-采用cgdb的方式来调试suricata源代码。
-
-
-
-协议插件架构是如何的？
-
-协议识别是如何的？
-
-
-
-
-
 # 零、预安装要求
 
 在ubuntu环境下，其依赖库如下：
@@ -311,10 +291,6 @@ SC_LOG_LEVEL=Debug suricata -u
 ## 2、3 suricata.yaml配置文件
 
 
-
-
-
-# 三、debug单步调试环境
 
 
 

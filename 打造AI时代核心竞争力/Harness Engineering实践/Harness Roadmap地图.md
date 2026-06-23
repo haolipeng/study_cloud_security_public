@@ -1,52 +1,45 @@
+https://github.com/walkinglabs/learn-harness-engineering
 
 
 
+通过如下的课程列表去学习：
 
-使用rust的clippy检测项目代码的圈复杂度和认知复杂度：
-
-```
-root@ebpf-machine:/home/work/suricata-8.0.4-study/rust# cargo clippy -p suricata --lib --no-deps
-    Checking suricata-htp v8.0.4 (/home/work/suricata-8.0.4-study/rust/htp)
-   Compiling suricata-derive v8.0.4 (/home/work/suricata-8.0.4-study/rust/derive)
-    Checking suricata-sys v8.0.4 (/home/work/suricata-8.0.4-study/rust/sys)
-    Checking suricata v8.0.4 (/home/work/suricata-8.0.4-study/rust)
-warning: very complex type used. Consider factoring parts into `type` definitions
-  --> src/iec61850mms/ber.rs:53:46
-   |
-53 | pub(super) fn parse_ber_tlv(input: &[u8]) -> Result<(u8, bool, u32, &[u8], &[u8]), ()> {
-   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.91.0/index.html#type_complexity
-   = note: `#[warn(clippy::type_complexity)]` on by default
-```
-
-上文中报parse_ber_tlv函数的复杂度太高，考虑优化下。
-
-我问了下AI工具，推荐改为
-
-```
-pub(super) struct BerTlv<'a> {
-      pub tag: u8,
-      pub constructed: bool,
-      pub length: u32,
-      pub value: &'a [u8],
-      pub rest: &'a [u8],
-  }
-
-  pub(super) fn parse_ber_tlv(input: &[u8]) -> Result<BerTlv<'_>, ()> {
-      ...
-  }
-
-  调用方会更清楚：
-
-  let tlv = parse_ber_tlv(input)?;
-  if tlv.tag == 0xa0 {
-      ...
-  }
-```
+https://walkinglabs.github.io/learn-harness-engineering/zh/
 
 
 
-如何重新获得项目代码的掌控感？
+起码包括上述内容：
 
-先做一份 iec61850mms 代码地图文档，不改代码，只整理调用链和模块职责。
+- 单元测试 — 能跑 make test 或 cargo test 或 go test
+- 集成测试/端到端测试 — 能跑完整流程
+- Linter — 比如 clippy、golangci-lint、静态分析工具
+- 编译检查 — 确保能编译通过（这个肯定有，但我想确认你是否会在 CI 或本地脚本里显式检查）
+- CI/CD — GitHub Actions / GitLab CI / Jenkins 之类的
+
+
+
+**AI Coding Agent Readiness Checklist**
+
+https://gist.github.com/gmoigneu/a963b595ac238ad2d2260ebb8b29f048
+
+
+
+**Making Your Repository AI-Ready**
+
+https://medium.com/@chalyi/making-your-repository-ai-ready-1ab45b05222b
+
+
+
+**项目仓库地址搜集**
+
+https://github.com/agent-next/agent-ready
+
+
+
+https://github.com/superduck-ai/agent-readiness
+
+
+
+# 2026年最新AIAgent应用开发学习路线零基础到精通
+
+https://github.com/liyupi/codefather/issues/51

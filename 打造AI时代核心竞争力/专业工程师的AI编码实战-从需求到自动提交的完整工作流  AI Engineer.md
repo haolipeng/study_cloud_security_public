@@ -58,7 +58,7 @@ B站视频核心内容
 
 将大块任务拆分为四个小任务，以便LLM能逐步消化，从而在高效状态下完成每一份工作。
 
-![image-20260427175427659](./picture/image-20260427175427659.png)
+![image-20260427175427659](https://gitee.com/codergeek/picgo-image/raw/master/image/202606051504378.png)
 
 RALPH循环
 

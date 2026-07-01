@@ -98,15 +98,18 @@
 
 同时满足这三点，适合放在入口文件。只满足其中一两点，就不要默认塞进 `AGENTS.md`，而是放到更合适的位置。
 
-适合写到 `AGENTS.md` 的内容类型，可以按下面这张表判断：
+适合写到 `AGENTS.md` 的内容类型，可以按下面这张表判断。注意：表格里的“索引”不是把细节写进来，而是告诉 agent 什么时候去读哪个文档。
 
 | 内容类型 | 应该写什么 | 示例 |
 | --- | --- | --- |
 | 项目概览 | 项目类型、主要技术栈、核心运行方式 | Python 3.11 + FastAPI 后端服务，使用 PostgreSQL |
-| 快速开始 | 安装、测试、lint、完整验证命令 | `make setup`、`make test`、`make check` |
-| 全局硬约束 | 所有任务都不能违反的安全、提交、验证要求 | 不提交密钥；数据库查询必须参数化 |
+| 快速开始 | 安装、启动、最小验证命令 | `make setup`、`make dev`、`make check` |
+| 全局硬约束 | 所有任务都不能违反的安全和修改边界 | 不提交密钥；不重构无关代码 |
 | 工作流程 | agent 做任务时必须遵守的通用步骤 | 修改现有行为前先读测试和调用方 |
-| 按需阅读索引 | 不同任务应该继续阅读的专题文档 | API 任务读 `docs/agent/api-patterns.md` |
+| 测试文档索引 | 测试策略、测试范围、测试命令放到哪里 | 测试相关任务读 `docs/agent/testing.md` |
+| 代码协作文档索引 | 代码风格、提交、PR 规范放到哪里 | 提交或开 PR 前读 `docs/agent/code-review-pr.md` |
+| 部署文档索引 | 部署、回滚、环境约束放到哪里 | 涉及发布读 `docs/agent/deployment.md` |
+| 专题文档索引 | API、数据库、安全等专题规则放到哪里 | API 任务读 `docs/agent/api-patterns.md` |
 
 不适合默认放进去的内容，不是没有价值，而是应该换位置：
 
@@ -151,7 +154,7 @@ my-fastapi-app/
 
 越靠近当前代码的 `AGENTS.md`，规则越具体。子目录文件不需要重复根目录已经写过的内容，只补充这个目录独有的差异。
 
-专题内容也不要塞进根文件。API 规范、数据库规则、部署流程、安全要求可以拆成独立文档，再从 `AGENTS.md` 里链接过去。这样 agent 只有在任务相关时才继续读取，不会每次都背一遍完整项目知识。
+专题内容也不要塞进根文件。测试策略、代码风格、提交与 PR、部署流程、API 规范、数据库规则、安全要求，都可以拆成独立文档，再从 `AGENTS.md` 里链接过去。这样 agent 只有在任务相关时才继续读取，不会每次都背一遍完整项目知识。
 
 最后，`AGENTS.md` 要像代码一样维护。Agent 反复犯同一个错，再补一条具体规则；规则已经能被测试、lint 或 CI 保证，就从文件里删掉；项目结构变了，也要同步更新入口文件。
 
@@ -185,9 +188,36 @@ my-fastapi-app/
 
 - 新增或修改 API：阅读 `docs/agent/api-patterns.md`
 - 涉及数据库变更：阅读 `docs/agent/database-rules.md`
-- 编写或修改测试：阅读 `docs/agent/testing-standards.md`
-- 涉及部署流程：阅读 `docs/agent/deployment-notes.md`
+- 编写或修改测试：阅读 `docs/agent/testing.md`
+- 涉及代码风格、提交、PR：阅读 `docs/agent/code-review-pr.md`
+- 涉及部署流程：阅读 `docs/agent/deployment.md`
 - 涉及认证、权限、密钥：阅读 `docs/agent/security-rules.md`
+```
+
+专题文档只放任务相关的少量规则即可，不要写成新的巨型说明。
+
+```markdown
+# docs/agent/testing.md
+
+- 改 API 时，至少运行对应接口测试：`pytest tests/api -q`。
+- 改数据库 schema 时，运行 migration 测试：`pytest tests/migrations -q`。
+- 只改文案或注释时，可说明未运行测试的原因。
+```
+
+```markdown
+# docs/agent/code-review-pr.md
+
+- 代码风格以现有模块为准，不引入新的抽象风格。
+- 提交信息用一句话说明变更目的，不写流水账。
+- PR 描述必须包含 Summary 和 Test plan。
+```
+
+```markdown
+# docs/agent/deployment.md
+
+- 涉及配置或 schema 变更时，PR 中必须说明回滚方式。
+- 不直接修改生产配置文件，所有环境差异走配置模板。
+- 部署步骤变化时，同步更新发布文档。
 ```
 
 这个模板遵循三个原则：

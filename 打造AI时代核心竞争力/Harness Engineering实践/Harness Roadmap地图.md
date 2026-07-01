@@ -1,3 +1,7 @@
+/////////////////////////////////////////////////////////////////////////////
+
+
+
 https://github.com/walkinglabs/learn-harness-engineering
 
 
@@ -5,6 +9,65 @@ https://github.com/walkinglabs/learn-harness-engineering
 通过如下的课程列表去学习：
 
 https://walkinglabs.github.io/learn-harness-engineering/zh/
+
+
+
+第一课 实验
+
+https://walkinglabs.github.io/learn-harness-engineering/zh/projects/project-01-baseline-vs-minimal-harness/
+
+
+
+限定30分钟时间和20轮次，从15：00开始实验
+
+
+
+好的范例是长什么样的？
+
+feature_list.json文件
+
+```
+{
+  "project": "project-01",
+  "description": "Baseline Electron knowledge base with minimal harness",
+  "features": [
+    {
+      "id": "window-launch",
+      "name": "Window Launch",
+      "description": "Electron app opens a BrowserWindow with correct dimensions and preload script",
+      "status": "pass",
+      "evidence": "npm run dev launches window at 1200x800 with contextIsolation=true and nodeIntegration=false",
+      "testedAt": "2026-03-30T10:00:00Z"
+    },
+    {
+      "id": "document-list",
+      "name": "Document List Panel",
+      "description": "Left sidebar shows imported documents with empty state message",
+      "status": "pass",
+      "evidence": "DocumentList component renders empty state when no documents, shows document cards when data present",
+      "testedAt": "2026-03-30T10:05:00Z"
+    },
+    {
+      "id": "question-panel",
+      "name": "Question Panel",
+      "description": "Bottom input bar accepts questions and submits via IPC",
+      "status": "pass",
+      "evidence": "QuestionPanel renders text input and Ask button, submits to window.knowledgeBase.qa.ask on Enter or click",
+      "testedAt": "2026-03-30T10:08:00Z"
+    },
+    {
+      "id": "data-directory",
+      "name": "Data Directory",
+      "description": "PersistenceService creates and manages userData/knowledge-base-data directory",
+      "status": "pass",
+      "evidence": "PersistenceService constructor calls ensureDirectories() creating data, documents, and index subdirectories",
+      "testedAt": "2026-03-30T10:10:00Z"
+    }
+  ]
+}
+```
+
+四个具体功能是窗口启动、文档列表、问答面板、本地数据目录。
 
 
 

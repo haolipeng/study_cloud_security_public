@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suricata 电力协议解析流水线</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #020617; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; padding: 32px; }
+.container { max-width: 1040px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 rgba(52,211,153,0.7); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.6);} 70% { box-shadow: 0 0 0 8px rgba(52,211,153,0);} 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0);} }
+h1 { font-size: 18px; font-weight: 700; }
+.subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
+.toolbar { position: relative; }
+.toolbar-toggle { background: #0f172a; border: 1px solid #334155; color: #94a3b8; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-family: inherit; }
+.toolbar-actions { display: none; gap: 8px; margin-top: 8px; position: absolute; right: 0; }
+.toolbar-actions.open { display: flex; }
+.toolbar-actions button { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.toolbar-actions button:hover { border-color: #64748b; }
+.diagram-card { border: 1px solid #1e293b; border-radius: 12px; padding: 16px; background: #0a0f1e; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
+.card { border: 1px solid #1e293b; border-radius: 10px; padding: 16px; background: #0a0f1e; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card-dot { width: 8px; height: 8px; border-radius: 50%; }
+.card h3 { font-size: 13px; font-weight: 600; }
+.card ul { list-style: none; }
+.card li { font-size: 11px; color: #94a3b8; line-height: 1.7; }
+.cyan { background: #22d3ee; } .emerald { background: #34d399; } .violet { background: #a78bfa; }
+.rose { background: #fb7185; } .amber { background: #fbbf24; }
+.footer { margin-top: 20px; font-size: 10px; color: #475569; text-align: center; }
+@media print { .toolbar { display: none !important; } }
+</style>
+</head>
+<body>
+<div class="container" id="report-container">
+<div class="header">
+<div class="header-left">
+<div class="pulse"></div>
+<div>
+<h1>Suricata 电力协议解析流水线</h1>
+<div class="subtitle">packet → decode → stream → app-layer → detect → EVE JSON · v8.0.4</div>
+</div>
+</div>
+<div class="toolbar">
+<button class="toolbar-toggle" onclick="document.querySelector('.toolbar-actions').classList.toggle('open')">⋯</button>
+<div class="toolbar-actions">
+<button onclick="copyAsImage()">📋 Copy</button>
+<button onclick="downloadPNG()">🖼️ PNG</button>
+<button onclick="downloadPDF()">📄 PDF</button>
+</div>
+</div>
+</div>
+<div class="diagram-card">
+<svg viewBox="0 0 1000 720" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+<defs>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+<path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+</pattern>
+<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+<polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="1000" height="720" fill="url(#grid)"/>
+
+<!-- ==== arrows first (render behind boxes) ==== -->
+<!-- capture -> decode -->
+<line x1="180" y1="90" x2="180" y2="150" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- decode -> stream -->
+<line x1="180" y1="230" x2="180" y2="290" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- decode(goose) -> detect (bypass app-layer, L2) -->
+<path d="M 320 190 L 700 190 L 700 430" fill="none" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="5,4" marker-end="url(#arrowhead)"/>
+<!-- stream -> app-layer -->
+<line x1="180" y1="370" x2="180" y2="430" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- app-layer -> detect -->
+<line x1="360" y1="500" x2="600" y2="500" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- detect -> output -->
+<line x1="720" y1="560" x2="720" y2="620" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+<!-- ==== 1. capture (frontend/edge) ==== -->
+<rect x="60" y="30" width="240" height="60" rx="6" fill="#0f172a"/>
+<rect x="60" y="30" width="240" height="60" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="180" y="55" fill="white" font-size="12" font-weight="600" text-anchor="middle">Packet Capture</text>
+<text x="180" y="72" fill="#94a3b8" font-size="9" text-anchor="middle">AF_PACKET / PCAP · source-*.c</text>
+
+<!-- ==== 2. decode layer (L2-L4) ==== -->
+<rect x="40" y="150" width="280" height="80" rx="6" fill="#0f172a"/>
+<rect x="40" y="150" width="280" height="80" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+<text x="180" y="174" fill="white" font-size="12" font-weight="600" text-anchor="middle">Decode 层 (L2/L3/L4)</text>
+<text x="180" y="192" fill="#94a3b8" font-size="9" text-anchor="middle">ethernet · ip · tcp/udp · decode.c</text>
+<text x="180" y="212" fill="#fb923c" font-size="9" text-anchor="middle" font-weight="600">GOOSE (decode-goose.c) — 二层直挂</text>
+
+<!-- ==== 3. stream / reassembly ==== -->
+<rect x="40" y="290" width="280" height="80" rx="6" fill="#0f172a"/>
+<rect x="40" y="290" width="280" height="80" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+<text x="180" y="316" fill="white" font-size="12" font-weight="600" text-anchor="middle">Stream / Reassembly</text>
+<text x="180" y="334" fill="#94a3b8" font-size="9" text-anchor="middle">stream-tcp.c · flow.c</text>
+<text x="180" y="352" fill="#94a3b8" font-size="9" text-anchor="middle">TCP 重组 · 流表管理</text>
+
+<!-- ==== 4. app-layer parsers ==== -->
+<rect x="40" y="430" width="320" height="150" rx="6" fill="#0f172a"/>
+<rect x="40" y="430" width="320" height="150" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="200" y="454" fill="white" font-size="12" font-weight="600" text-anchor="middle">App-Layer 解析 (L7)</text>
+<text x="200" y="470" fill="#94a3b8" font-size="9" text-anchor="middle">app-layer.c · 协议识别 + 状态机</text>
+<!-- C-side -->
+<rect x="60" y="486" width="130" height="34" rx="4" fill="rgba(6,78,59,0.35)" stroke="#34d399" stroke-width="1"/>
+<text x="125" y="500" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">C 侧</text>
+<text x="125" y="513" fill="#94a3b8" font-size="8" text-anchor="middle">Modbus · DNP3</text>
+<!-- Rust-side -->
+<rect x="210" y="486" width="130" height="34" rx="4" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+<text x="275" y="500" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">Rust 侧</text>
+<text x="275" y="513" fill="#94a3b8" font-size="8" text-anchor="middle">IEC104·MMS·S7comm</text>
+<text x="200" y="545" fill="#94a3b8" font-size="8" text-anchor="middle">rust/src/{iec104,iec61850mms,s7comm,modbus}</text>
+<text x="200" y="562" fill="#94a3b8" font-size="8" text-anchor="middle">FFI 绑定回 C 检测引擎</text>
+
+<!-- ==== 5. detect engine ==== -->
+<rect x="600" y="430" width="240" height="130" rx="6" fill="#0f172a"/>
+<rect x="600" y="430" width="240" height="130" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+<text x="720" y="456" fill="white" font-size="12" font-weight="600" text-anchor="middle">Detect Engine</text>
+<text x="720" y="474" fill="#94a3b8" font-size="9" text-anchor="middle">detect-engine.c · 规则匹配</text>
+<text x="720" y="500" fill="#94a3b8" font-size="9" text-anchor="middle">MPM 多模匹配 · keyword</text>
+<text x="720" y="520" fill="#94a3b8" font-size="9" text-anchor="middle">协议关键字 (mms/s7/modbus)</text>
+<text x="720" y="540" fill="#fb7185" font-size="9" text-anchor="middle" font-weight="600">.rules 签名告警</text>
+
+<!-- ==== 6. output ==== -->
+<rect x="600" y="620" width="240" height="60" rx="6" fill="#0f172a"/>
+<rect x="600" y="620" width="240" height="60" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="720" y="645" fill="white" font-size="12" font-weight="600" text-anchor="middle">EVE JSON 输出</text>
+<text x="720" y="662" fill="#94a3b8" font-size="9" text-anchor="middle">output-json-*.c · alert / flow / anomaly</text>
+
+<!-- legend (outside all boxes) -->
+<rect x="40" y="620" width="14" height="14" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399"/><text x="60" y="631" fill="#94a3b8" font-size="9">解码/流</text>
+<rect x="130" y="620" width="14" height="14" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/><text x="150" y="631" fill="#94a3b8" font-size="9">应用层</text>
+<rect x="215" y="620" width="14" height="14" rx="3" fill="rgba(136,19,55,0.4)" stroke="#fb7185"/><text x="235" y="631" fill="#94a3b8" font-size="9">检测</text>
+<rect x="285" y="620" width="14" height="14" rx="3" fill="rgba(8,51,68,0.4)" stroke="#22d3ee"/><text x="305" y="631" fill="#94a3b8" font-size="9">采集/输出</text>
+<line x1="40" y1="652" x2="60" y2="652" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="5,4"/><text x="66" y="655" fill="#94a3b8" font-size="9">GOOSE 二层旁路</text>
+</svg>
+</div>
+<div class="cards">
+<div class="card">
+<div class="card-header"><div class="card-dot emerald"></div><h3>数据通路</h3></div>
+<ul>
+<li>• 采集 → decode → stream → app-layer</li>
+<li>• app-layer → detect → EVE JSON</li>
+<li>• GOOSE 走 L2 解码,旁路 app-layer</li>
+</ul>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-dot violet"></div><h3>电力协议</h3></div>
+<ul>
+<li>• C 侧:Modbus · DNP3</li>
+<li>• Rust 侧:IEC104 · MMS · S7comm</li>
+<li>• GOOSE:decode-goose.c (二层)</li>
+</ul>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-dot rose"></div><h3>检测与输出</h3></div>
+<ul>
+<li>• detect-engine.c + MPM 多模匹配</li>
+<li>• 协议关键字签名 (.rules)</li>
+<li>• output-json-*.c 结构化告警</li>
+</ul>
+</div>
+</div>
+<div class="footer">Suricata 8.0.4 · 电力协议解析架构 · 生成于 architecture-diagram skill</div>
+</div>
+<script>
+function capture(cb){
+  const el = document.getElementById('report-container');
+  const r = el.getBoundingClientRect();
+  const p = 32;
+  html2canvas(document.body, {
+    backgroundColor:'#020617',
+    x: r.left+window.scrollX-p, y: r.top+window.scrollY-p,
+    width: r.width+p*2, height: r.height+p*2, scale:2,
+    ignoreElements: n => n.classList && n.classList.contains('toolbar')
+  }).then(cb);
+}
+function copyAsImage(){ capture(c=>c.toBlob(b=>navigator.clipboard.write([new ClipboardItem({'image/png':b})]))); }
+function downloadPNG(){ capture(c=>{const a=document.createElement('a');a.download='suricata-power-pipeline.png';a.href=c.toDataURL('image/png');a.click();}); }
+function downloadPDF(){ capture(c=>{const{jsPDF}=window.jspdf;const img=c.toDataURL('image/png');const pdf=new jsPDF({orientation:c.width>c.height?'l':'p',unit:'px',format:[c.width,c.height]});pdf.addImage(img,'PNG',0,0,c.width,c.height);pdf.save('suricata-power-pipeline.pdf');}); }
+</script>
+</body>
+</html>

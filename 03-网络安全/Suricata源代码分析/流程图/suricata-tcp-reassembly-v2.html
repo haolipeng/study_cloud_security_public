@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suricata TCP 流重组专题 — 形象版</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #020617; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; padding: 32px; }
+.container { max-width: 1080px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 rgba(52,211,153,0.7); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.6);} 70% { box-shadow: 0 0 0 8px rgba(52,211,153,0);} 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0);} }
+h1 { font-size: 18px; font-weight: 700; }
+.subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
+.toolbar { position: relative; }
+.toolbar-toggle { background: #0f172a; border: 1px solid #334155; color: #94a3b8; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-family: inherit; }
+.toolbar-actions { display: none; gap: 8px; margin-top: 8px; position: absolute; right: 0; }
+.toolbar-actions.open { display: flex; }
+.toolbar-actions button { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.toolbar-actions button:hover { border-color: #64748b; }
+.diagram-card { border: 1px solid #1e293b; border-radius: 12px; padding: 16px; background: #0a0f1e; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
+.card { border: 1px solid #1e293b; border-radius: 10px; padding: 16px; background: #0a0f1e; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card-dot { width: 8px; height: 8px; border-radius: 50%; }
+.card h3 { font-size: 13px; font-weight: 600; }
+.card ul { list-style: none; }
+.card li { font-size: 11px; color: #94a3b8; line-height: 1.7; }
+.cyan { background: #22d3ee; } .emerald { background: #34d399; } .violet { background: #a78bfa; }
+.rose { background: #fb7185; } .amber { background: #fbbf24; } .orange { background: #fb923c; }
+.footer { margin-top: 20px; font-size: 10px; color: #475569; text-align: center; }
+@media print { .toolbar { display: none !important; } }
+</style>
+</head>
+<body>
+<div class="container" id="report-container">
+<div class="header">
+<div class="header-left">
+<div class="pulse"></div>
+<div>
+<h1>Suricata TCP 流重组 — 形象版</h1>
+<div class="subtitle">比喻:乱序快递 → 货架排序 → 传送带输送 → 三个读头消费 · stream-tcp-*.c</div>
+</div>
+</div>
+<div class="toolbar">
+<button class="toolbar-toggle" onclick="document.querySelector('.toolbar-actions').classList.toggle('open')">⋯</button>
+<div class="toolbar-actions">
+<button onclick="copyAsImage()">📋 Copy</button>
+<button onclick="downloadPNG()">🖼️ PNG</button>
+<button onclick="downloadPDF()">📄 PDF</button>
+</div>
+</div>
+</div>
+<div class="diagram-card">
+<svg viewBox="0 0 1000 900" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+<defs>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+<path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+</pattern>
+<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+<polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+</marker>
+<marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+<polygon points="0 0, 10 3.5, 0 7" fill="#34d399"/>
+</marker>
+<linearGradient id="conveyor" x1="0%" y1="0%" x2="100%" y2="0%">
+<stop offset="0%" style="stop-color:#fb923c;stop-opacity:0.3"/>
+<stop offset="50%" style="stop-color:#fbbf24;stop-opacity:0.4"/>
+<stop offset="100%" style="stop-color:#34d399;stop-opacity:0.5"/>
+</linearGradient>
+</defs>
+<rect x="0" y="0" width="1000" height="900" fill="url(#grid)"/>
+
+<!-- title block -->
+<text x="500" y="35" fill="#fbbf24" font-size="16" font-weight="700" text-anchor="middle">📦 TCP 段 = 乱序快递包裹 → 🗂️ 红黑树货架排序 → 🎞️ 传送带连续输送 → 👁️ 三路读头消费</text>
+
+<!-- ==== STEP 1: 乱序段到达 ==== -->
+<rect x="40" y="60" width="920" height="140" rx="8" fill="rgba(30,41,59,0.25)" stroke="#334155" stroke-width="1"/>
+<text x="60" y="85" fill="#22d3ee" font-size="13" font-weight="600">① 乱序 TCP 段到达(像快递乱序送达)</text>
+
+<!-- packets arriving -->
+<rect x="80" y="100" width="110" height="70" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="135" y="125" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">📦 seq=1400</text>
+<text x="135" y="142" fill="#94a3b8" font-size="9" text-anchor="middle">len=200</text>
+<text x="135" y="158" fill="#fb7185" font-size="8" text-anchor="middle">乱序!缺1000~1400</text>
+
+<rect x="220" y="100" width="110" height="70" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="275" y="125" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">📦 seq=1000</text>
+<text x="275" y="142" fill="#94a3b8" font-size="9" text-anchor="middle">len=200</text>
+<text x="275" y="158" fill="#34d399" font-size="8" text-anchor="middle">按序✓ base开始</text>
+
+<rect x="360" y="100" width="110" height="70" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="415" y="125" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">📦 seq=1200</text>
+<text x="415" y="142" fill="#94a3b8" font-size="9" text-anchor="middle">len=200</text>
+<text x="415" y="158" fill="#34d399" font-size="8" text-anchor="middle">补空洞!</text>
+
+<text x="520" y="135" fill="#64748b" font-size="10">→ 进入状态机校验:</text>
+<text x="530" y="155" fill="#94a3b8" font-size="9">• 窗口/PAWS/SACK ✓</text>
+<text x="530" y="170" fill="#94a3b8" font-size="9">• 重传检测 · OS policy</text>
+
+<!-- arrow down -->
+<line x1="500" y1="205" x2="500" y2="240" stroke="#34d399" stroke-width="2" marker-end="url(#arrow-emerald)"/>
+
+<!-- ==== STEP 2: 红黑树货架排序 ==== -->
+<rect x="40" y="240" width="920" height="160" rx="8" fill="rgba(30,41,59,0.25)" stroke="#334155" stroke-width="1"/>
+<text x="60" y="265" fill="#34d399" font-size="13" font-weight="600">② 红黑树货架:按 seq 自动排序(像快递柜按单号排)</text>
+
+<!-- shelf visualization -->
+<rect x="80" y="285" width="840" height="90" rx="6" fill="rgba(6,78,59,0.3)" stroke="#34d399" stroke-width="1.5"/>
+<text x="500" y="305" fill="#e2e8f0" font-size="11" text-anchor="middle" font-weight="600">🗂️ seg_tree (RB_HEAD) — 红黑树货架</text>
+
+<!-- sorted segments on shelf -->
+<rect x="120" y="320" width="130" height="40" rx="4" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1"/>
+<text x="185" y="338" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">📋 Seg{1000}</text>
+<text x="185" y="352" fill="#94a3b8" font-size="8" text-anchor="middle">len=200 · offset=0</text>
+
+<rect x="280" y="320" width="130" height="40" rx="4" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1"/>
+<text x="345" y="338" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">📋 Seg{1200}</text>
+<text x="345" y="352" fill="#94a3b8" font-size="8" text-anchor="middle">len=200 · offset=200</text>
+
+<rect x="440" y="320" width="130" height="40" rx="4" fill="rgba(6,78,59,0.5)" stroke="#34d399" stroke-width="1"/>
+<text x="505" y="338" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">📋 Seg{1400}</text>
+<text x="505" y="352" fill="#94a3b8" font-size="8" text-anchor="middle">len=200 · offset=400</text>
+
+<text x="620" y="340" fill="#a78bfa" font-size="9">→ 元数据(seq/len/offset)</text>
+<text x="620" y="355" fill="#94a3b8" font-size="8">payload 不在这!</text>
+
+<!-- arrow down -->
+<line x1="500" y1="405" x2="500" y2="440" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+<!-- ==== STEP 3: 传送带(StreamingBuffer) ==== -->
+<rect x="40" y="440" width="920" height="160" rx="8" fill="rgba(30,41,59,0.25)" stroke="#334155" stroke-width="1"/>
+<text x="60" y="465" fill="#fbbf24" font-size="13" font-weight="600">③ 传送带:连续字节流动区(StreamingBuffer)</text>
+
+<!-- conveyor belt -->
+<rect x="80" y="485" width="840" height="80" rx="6" fill="url(#conveyor)" stroke="#fbbf24" stroke-width="2"/>
+<text x="500" y="508" fill="#0f172a" font-size="11" text-anchor="middle" font-weight="700">🎞️ StreamingBuffer (sb) — 实际 payload 连续存储</text>
+
+<!-- data blocks on conveyor -->
+<rect x="100" y="520" width="240" height="30" rx="3" fill="rgba(6,78,59,0.6)" stroke="#34d399" stroke-width="1"/>
+<text x="220" y="539" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">[1000,1200) 200字节</text>
+
+<rect x="360" y="520" width="240" height="30" rx="3" fill="rgba(6,78,59,0.6)" stroke="#34d399" stroke-width="1"/>
+<text x="480" y="539" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">[1200,1400) 200字节</text>
+
+<rect x="620" y="520" width="240" height="30" rx="3" fill="rgba(6,78,59,0.6)" stroke="#34d399" stroke-width="1"/>
+<text x="740" y="539" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">[1400,1600) 200字节</text>
+
+<!-- base_seq marker -->
+<line x1="100" y1="475" x2="100" y2="565" stroke="#fbbf24" stroke-width="3"/>
+<text x="105" y="480" fill="#fbbf24" font-size="9" font-weight="600">base_seq=1000</text>
+<text x="105" y="575" fill="#94a3b8" font-size="8">连续起点</text>
+
+<!-- arrow down -->
+<line x1="500" y1="605" x2="500" y2="640" stroke="#64748b" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+<!-- ==== STEP 4: 三路读头消费 ==== -->
+<rect x="40" y="640" width="920" height="220" rx="8" fill="rgba(30,41,59,0.25)" stroke="#334155" stroke-width="1"/>
+<text x="60" y="665" fill="#a78bfa" font-size="13" font-weight="600">④ 三个读头:各自独立消费(像磁带机的多个读头)</text>
+
+<!-- progress rail -->
+<rect x="80" y="685" width="840" height="10" rx="2" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1"/>
+<text x="500" y="682" fill="#94a3b8" font-size="8" text-anchor="middle">进度轨道(相对 base_seq 偏移)</text>
+
+<!-- 3 read heads -->
+<rect x="120" y="715" width="240" height="65" rx="6" fill="rgba(6,78,59,0.35)" stroke="#34d399" stroke-width="1.5"/>
+<text x="240" y="735" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">👁️ app_progress_rel</text>
+<text x="240" y="752" fill="#94a3b8" font-size="8" text-anchor="middle">协议解析读头</text>
+<text x="240" y="767" fill="#34d399" font-size="8" text-anchor="middle">MMS/S7/Modbus parser</text>
+<!-- pointer -->
+<line x1="240" y1="710" x2="240" y2="695" stroke="#34d399" stroke-width="2"/>
+<circle cx="240" cy="690" r="4" fill="#34d399"/>
+
+<rect x="380" y="715" width="240" height="65" rx="6" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1.5"/>
+<text x="500" y="735" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">👁️ raw_progress_rel</text>
+<text x="500" y="752" fill="#94a3b8" font-size="8" text-anchor="middle">原始流匹配读头</text>
+<text x="500" y="767" fill="#fb7185" font-size="8" text-anchor="middle">Detect Engine · stream keyword</text>
+<line x1="500" y1="710" x2="500" y2="695" stroke="#fb7185" stroke-width="2"/>
+<circle cx="500" cy="690" r="4" fill="#fb7185"/>
+
+<rect x="640" y="715" width="240" height="65" rx="6" fill="rgba(8,51,68,0.35)" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="760" y="735" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">👁️ log_progress_rel</text>
+<text x="760" y="752" fill="#94a3b8" font-size="8" text-anchor="middle">日志输出读头</text>
+<text x="760" y="767" fill="#22d3ee" font-size="8" text-anchor="middle">EVE JSON · 回收门槛</text>
+<line x1="760" y1="710" x2="760" y2="695" stroke="#22d3ee" stroke-width="2"/>
+<circle cx="760" cy="690" r="4" fill="#22d3ee"/>
+
+<text x="500" y="810" fill="#fbbf24" font-size="10" text-anchor="middle" font-weight="600">💡 最慢的读头决定左侧数据何时能回收!</text>
+<text x="500" y="828" fill="#94a3b8" font-size="9" text-anchor="middle">所有读头读完 → base_seq 右移 → StreamingBuffer 左侧区域释放</text>
+
+<!-- legend -->
+<text x="60" y="875" fill="#64748b" font-size="9" font-weight="600">关键比喻:</text>
+<text x="150" y="875" fill="#22d3ee" font-size="8">📦=TCP段</text>
+<text x="240" y="875" fill="#34d399" font-size="8">🗂️=红黑树货架</text>
+<text x="360" y="875" fill="#fbbf24" font-size="8">🎞️=传送带</text>
+<text x="460" y="875" fill="#a78bfa" font-size="8">👁️=读头</text>
+<text x="540" y="875" fill="#fb7185" font-size="8">gap=传送带断开</text>
+</svg>
+</div>
+<div class="cards">
+<div class="card">
+<div class="card-header"><div class="card-dot emerald"></div><h3>核心比喻</h3></div>
+<ul>
+<li>• 📦 TCP段 = 快递包裹(可能乱序)</li>
+<li>• 🗂️ 红黑树 = 智能货架(自动按单号排)</li>
+<li>• 🎞️ StreamingBuffer = 传送带(连续输送)</li>
+<li>• 👁️ 三读头 = 不同工序同时读取</li>
+</ul>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-dot violet"></div><h3>为什么分两层?</h3></div>
+<ul>
+<li>• 货架只存"单号+位置",不存货物</li>
+<li>• 真实货物(payload)在传送带上</li>
+<li>• 乱序段先上货架,等前面到齐再上传送带</li>
+<li>• 传送带始终连续,下游不用处理乱序</li>
+</ul>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-dot amber"></div><h3>base_seq 滑动机制</h3></div>
+<ul>
+<li>• base_seq = 传送带起点</li>
+<li>• 有 gap(断开) → base_seq 不动</li>
+<li>• gap 补齐 → base_seq 右移</li>
+<li>• 最慢读头决定左侧何时回收</li>
+</ul>
+</div>
+</div>
+<div class="footer">Suricata 8.0.4 · TCP 流重组形象版 · stream-tcp-reassemble.c · TcpStream/TcpSegment/StreamingBuffer · 生成于 architecture-diagram skill</div>
+</div>
+<script>
+function capture(cb){
+  const el = document.getElementById('report-container');
+  const r = el.getBoundingClientRect();
+  const p = 32;
+  html2canvas(document.body, {
+    backgroundColor:'#020617',
+    x: r.left+window.scrollX-p, y: r.top+window.scrollY-p,
+    width: r.width+p*2, height: r.height+p*2, scale:2,
+    ignoreElements: n => n.classList && n.classList.contains('toolbar')
+  }).then(cb);
+}
+function copyAsImage(){ capture(c=>c.toBlob(b=>navigator.clipboard.write([new ClipboardItem({'image/png':b})]))); }
+function downloadPNG(){ capture(c=>{const a=document.createElement('a');a.download='suricata-tcp-reassembly-v2.png';a.href=c.toDataURL('image/png');a.click();}); }
+function downloadPDF(){ capture(c=>{const{jsPDF}=window.jspdf;const img=c.toDataURL('image/png');const pdf=new jsPDF({orientation:c.width>c.height?'l':'p',unit:'px',format:[c.width,c.height]});pdf.addImage(img,'PNG',0,0,c.width,c.height);pdf.save('suricata-tcp-reassembly-v2.pdf');}); }
+</script>
+</body>
+</html>

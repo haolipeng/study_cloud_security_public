@@ -65,6 +65,14 @@ CFLAGS="-g -O0" ./configure --prefix=/usr  --sysconfdir=/etc --localstatedir=/va
 
 
 
+如果只开启单元测试，但不开启debug模式。
+
+```
+./configure --prefix=/usr  --sysconfdir=/etc --localstatedir=/var --enable-unittests
+```
+
+
+
 ### 3）htp库（可选）
 
 ```shell

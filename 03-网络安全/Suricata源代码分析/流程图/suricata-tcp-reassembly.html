@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suricata TCP 流重组专题图</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #020617; color: #e2e8f0; font-family: 'JetBrains Mono', monospace; padding: 32px; }
+.container { max-width: 1040px; margin: 0 auto; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.header-left { display: flex; align-items: center; gap: 12px; }
+.pulse { width: 10px; height: 10px; border-radius: 50%; background: #34d399; box-shadow: 0 0 0 0 rgba(52,211,153,0.7); animation: pulse 2s infinite; }
+@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.6);} 70% { box-shadow: 0 0 0 8px rgba(52,211,153,0);} 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0);} }
+h1 { font-size: 18px; font-weight: 700; }
+.subtitle { font-size: 11px; color: #64748b; margin-top: 2px; }
+.toolbar { position: relative; }
+.toolbar-toggle { background: #0f172a; border: 1px solid #334155; color: #94a3b8; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-family: inherit; }
+.toolbar-actions { display: none; gap: 8px; margin-top: 8px; position: absolute; right: 0; }
+.toolbar-actions.open { display: flex; }
+.toolbar-actions button { background: #0f172a; border: 1px solid #334155; color: #e2e8f0; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-family: inherit; font-size: 12px; }
+.toolbar-actions button:hover { border-color: #64748b; }
+.diagram-card { border: 1px solid #1e293b; border-radius: 12px; padding: 16px; background: #0a0f1e; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; }
+.card { border: 1px solid #1e293b; border-radius: 10px; padding: 16px; background: #0a0f1e; }
+.card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.card-dot { width: 8px; height: 8px; border-radius: 50%; }
+.card h3 { font-size: 13px; font-weight: 600; }
+.card ul { list-style: none; }
+.card li { font-size: 11px; color: #94a3b8; line-height: 1.7; }
+.cyan { background: #22d3ee; } .emerald { background: #34d399; } .violet { background: #a78bfa; }
+.rose { background: #fb7185; } .amber { background: #fbbf24; } .orange { background: #fb923c; }
+.footer { margin-top: 20px; font-size: 10px; color: #475569; text-align: center; }
+@media print { .toolbar { display: none !important; } }
+</style>
+</head>
+<body>
+<div class="container" id="report-container">
+<div class="header">
+<div class="header-left">
+<div class="pulse"></div>
+<div>
+<h1>Suricata TCP 流重组专题</h1>
+<div class="subtitle">segment → RB-tree → StreamingBuffer → progress pointers · stream-tcp-*.c · v8.0.4</div>
+</div>
+</div>
+<div class="toolbar">
+<button class="toolbar-toggle" onclick="document.querySelector('.toolbar-actions').classList.toggle('open')">⋯</button>
+<div class="toolbar-actions">
+<button onclick="copyAsImage()">📋 Copy</button>
+<button onclick="downloadPNG()">🖼️ PNG</button>
+<button onclick="downloadPDF()">📄 PDF</button>
+</div>
+</div>
+</div>
+<div class="diagram-card">
+<svg viewBox="0 0 1000 760" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="JetBrains Mono, monospace">
+<defs>
+<pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+<path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+</pattern>
+<marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+<polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
+</marker>
+</defs>
+<rect x="0" y="0" width="1000" height="760" fill="url(#grid)"/>
+
+<!-- ==== arrows (behind boxes) ==== -->
+<line x1="160" y1="92" x2="160" y2="130" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<line x1="160" y1="210" x2="160" y2="250" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<line x1="160" y1="330" x2="160" y2="370" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- session -> segtree -->
+<line x1="320" y1="450" x2="380" y2="450" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- segtree -> streamingbuffer -->
+<line x1="620" y1="450" x2="680" y2="450" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- session -> progress consumers (down) -->
+<line x1="160" y1="530" x2="160" y2="580" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+<!-- retrans/gap feedback (rose dashed) -->
+<path d="M 280 290 L 470 290 L 470 250" fill="none" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#arrowhead)"/>
+
+<!-- ==== 1. packet in ==== -->
+<rect x="40" y="32" width="240" height="60" rx="6" fill="#0f172a"/>
+<rect x="40" y="32" width="240" height="60" rx="6" fill="rgba(8,51,68,0.4)" stroke="#22d3ee" stroke-width="1.5"/>
+<text x="160" y="57" fill="white" font-size="12" font-weight="600" text-anchor="middle">TCP 报文入口</text>
+<text x="160" y="74" fill="#94a3b8" font-size="9" text-anchor="middle">StreamTcp() · stream-tcp.c</text>
+
+<!-- ==== 2. state machine + seq validation ==== -->
+<rect x="40" y="130" width="240" height="80" rx="6" fill="#0f172a"/>
+<rect x="40" y="130" width="240" height="80" rx="6" fill="rgba(136,19,55,0.4)" stroke="#fb7185" stroke-width="1.5"/>
+<text x="160" y="154" fill="white" font-size="12" font-weight="600" text-anchor="middle">状态机 + 序号校验</text>
+<text x="160" y="172" fill="#94a3b8" font-size="9" text-anchor="middle">SYN_SENT→ESTABLISHED→...→CLOSED</text>
+<text x="160" y="190" fill="#94a3b8" font-size="9" text-anchor="middle">窗口/PAWS · SACK (stream-tcp-sack.c)</text>
+
+<!-- ==== 3. segment handling ==== -->
+<rect x="40" y="250" width="240" height="80" rx="6" fill="#0f172a"/>
+<rect x="40" y="250" width="240" height="80" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+<text x="160" y="274" fill="white" font-size="12" font-weight="600" text-anchor="middle">段处理 / 排序</text>
+<text x="160" y="292" fill="#94a3b8" font-size="9" text-anchor="middle">乱序缓存 · 重传检测 · OS policy</text>
+<text x="160" y="310" fill="#94a3b8" font-size="9" text-anchor="middle">stream-tcp-list.c · reassemble.c</text>
+
+<!-- ==== 4. TcpSession (double stream) ==== -->
+<rect x="40" y="370" width="240" height="160" rx="6" fill="#0f172a"/>
+<rect x="40" y="370" width="240" height="160" rx="6" fill="rgba(76,29,149,0.4)" stroke="#a78bfa" stroke-width="1.5"/>
+<text x="160" y="392" fill="white" font-size="12" font-weight="600" text-anchor="middle">TcpSession</text>
+<rect x="56" y="404" width="208" height="52" rx="4" fill="rgba(8,51,68,0.35)" stroke="#22d3ee" stroke-width="1"/>
+<text x="160" y="422" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">client_stream (TcpStream)</text>
+<text x="160" y="437" fill="#94a3b8" font-size="8" text-anchor="middle">isn·next_seq·last_ack·base_seq</text>
+<text x="160" y="449" fill="#94a3b8" font-size="8" text-anchor="middle">window·next_win·wscale</text>
+<rect x="56" y="464" width="208" height="52" rx="4" fill="rgba(6,78,59,0.35)" stroke="#34d399" stroke-width="1"/>
+<text x="160" y="482" fill="#e2e8f0" font-size="9" text-anchor="middle" font-weight="600">server_stream (TcpStream)</text>
+<text x="160" y="497" fill="#94a3b8" font-size="8" text-anchor="middle">seg_tree (RB-tree) → sb</text>
+<text x="160" y="509" fill="#94a3b8" font-size="8" text-anchor="middle">segs_right_edge</text>
+
+<!-- ==== 5. seg_tree RB ==== -->
+<rect x="380" y="390" width="240" height="120" rx="6" fill="#0f172a"/>
+<rect x="380" y="390" width="240" height="120" rx="6" fill="rgba(6,78,59,0.4)" stroke="#34d399" stroke-width="1.5"/>
+<text x="500" y="414" fill="white" font-size="12" font-weight="600" text-anchor="middle">seg_tree · 红黑树</text>
+<text x="500" y="432" fill="#94a3b8" font-size="9" text-anchor="middle">RB_HEAD(TCPSEG, TcpSegment)</text>
+<text x="500" y="450" fill="#94a3b8" font-size="9" text-anchor="middle">按 seq 排序 · 元数据不含 payload</text>
+<text x="500" y="470" fill="#94a3b8" font-size="9" text-anchor="middle">TcpSegmentCompare()</text>
+<text x="500" y="490" fill="#a78bfa" font-size="9" text-anchor="middle" font-weight="600">payload_offset → StreamingBuffer</text>
+
+<!-- ==== 6. StreamingBuffer ==== -->
+<rect x="680" y="390" width="280" height="120" rx="6" fill="#0f172a"/>
+<rect x="680" y="390" width="280" height="120" rx="6" fill="rgba(120,53,15,0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+<text x="820" y="414" fill="white" font-size="12" font-weight="600" text-anchor="middle">StreamingBuffer (sb)</text>
+<text x="820" y="432" fill="#94a3b8" font-size="9" text-anchor="middle">实际连续字节存储区</text>
+<text x="820" y="450" fill="#94a3b8" font-size="9" text-anchor="middle">滑动区间 · region 管理</text>
+<text x="820" y="470" fill="#94a3b8" font-size="9" text-anchor="middle">STREAM_BASE_OFFSET = base_seq</text>
+<text x="820" y="490" fill="#fbbf24" font-size="9" text-anchor="middle" font-weight="600">已 ACK 且连续 → 可供消费</text>
+
+<!-- ==== 7. progress consumers ==== -->
+<rect x="40" y="580" width="920" height="120" rx="6" fill="#0f172a"/>
+<rect x="40" y="580" width="920" height="120" rx="6" fill="rgba(30,41,59,0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="500" y="604" fill="white" font-size="12" font-weight="600" text-anchor="middle">进度指针驱动的下游消费 (相对 base_seq)</text>
+<rect x="70" y="620" width="270" height="60" rx="4" fill="rgba(6,78,59,0.35)" stroke="#34d399" stroke-width="1"/>
+<text x="205" y="642" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">app_progress_rel</text>
+<text x="205" y="660" fill="#94a3b8" font-size="8" text-anchor="middle">→ App-Layer 协议解析</text>
+<text x="205" y="672" fill="#94a3b8" font-size="8" text-anchor="middle">min_inspect_depth · data_required</text>
+<rect x="365" y="620" width="270" height="60" rx="4" fill="rgba(136,19,55,0.35)" stroke="#fb7185" stroke-width="1"/>
+<text x="500" y="642" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">raw_progress_rel</text>
+<text x="500" y="660" fill="#94a3b8" font-size="8" text-anchor="middle">→ Detect Engine 原始流匹配</text>
+<text x="500" y="672" fill="#94a3b8" font-size="8" text-anchor="middle">stream keyword · MPM</text>
+<rect x="660" y="620" width="270" height="60" rx="4" fill="rgba(8,51,68,0.35)" stroke="#22d3ee" stroke-width="1"/>
+<text x="795" y="642" fill="#e2e8f0" font-size="10" text-anchor="middle" font-weight="600">log_progress_rel</text>
+<text x="795" y="660" fill="#94a3b8" font-size="8" text-anchor="middle">→ 流日志记录器</text>
+<text x="795" y="672" fill="#94a3b8" font-size="8" text-anchor="middle">已消费区可被回收</text>
+
+<!-- legend (below all boxes) -->
+<rect x="40" y="720" width="14" height="14" rx="3" fill="rgba(136,19,55,0.4)" stroke="#fb7185"/><text x="60" y="731" fill="#94a3b8" font-size="9">状态/序号</text>
+<rect x="150" y="720" width="14" height="14" rx="3" fill="rgba(6,78,59,0.4)" stroke="#34d399"/><text x="170" y="731" fill="#94a3b8" font-size="9">段/树</text>
+<rect x="240" y="720" width="14" height="14" rx="3" fill="rgba(76,29,149,0.4)" stroke="#a78bfa"/><text x="260" y="731" fill="#94a3b8" font-size="9">会话</text>
+<rect x="315" y="720" width="14" height="14" rx="3" fill="rgba(120,53,15,0.3)" stroke="#fbbf24"/><text x="335" y="731" fill="#94a3b8" font-size="9">缓冲区</text>
+<line x1="410" y1="727" x2="430" y2="727" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,4"/><text x="436" y="731" fill="#94a3b8" font-size="9">重传/乱序反馈</text>
+</svg>
+</div>
+<div class="cards">
+<div class="card">
+<div class="card-header"><div class="card-dot emerald"></div><h3>段与存储分离</h3></div>
+<ul>
+<li>• seg_tree 只存元数据(seq/长度/偏移)</li>
+<li>• payload 统一进 StreamingBuffer sb</li>
+<li>• 红黑树按 seq 有序,O(log n) 插入</li>
+</ul>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-dot violet"></div><h3>序号锚点</h3></div>
+<ul>
+<li>• isn → next_seq / last_ack</li>
+<li>• base_seq = 重组基准 (BASE_OFFSET)</li>
+<li>• 窗口/PAWS/SACK 决定可接收范围</li>
+</ul>
+</div>
+<div class="card">
+<div class="card-header"><div class="card-dot amber"></div><h3>三路进度指针</h3></div>
+<ul>
+<li>• app_progress_rel → 协议解析</li>
+<li>• raw_progress_rel → 检测引擎</li>
+<li>• log_progress_rel → 日志/回收</li>
+</ul>
+</div>
+</div>
+<div class="footer">Suricata 8.0.4 · TCP 流重组 · stream-tcp.c / -reassemble.c / -list.c / -sack.c · 生成于 architecture-diagram skill</div>
+</div>
+<script>
+function capture(cb){
+  const el = document.getElementById('report-container');
+  const r = el.getBoundingClientRect();
+  const p = 32;
+  html2canvas(document.body, {
+    backgroundColor:'#020617',
+    x: r.left+window.scrollX-p, y: r.top+window.scrollY-p,
+    width: r.width+p*2, height: r.height+p*2, scale:2,
+    ignoreElements: n => n.classList && n.classList.contains('toolbar')
+  }).then(cb);
+}
+function copyAsImage(){ capture(c=>c.toBlob(b=>navigator.clipboard.write([new ClipboardItem({'image/png':b})]))); }
+function downloadPNG(){ capture(c=>{const a=document.createElement('a');a.download='suricata-tcp-reassembly.png';a.href=c.toDataURL('image/png');a.click();}); }
+function downloadPDF(){ capture(c=>{const{jsPDF}=window.jspdf;const img=c.toDataURL('image/png');const pdf=new jsPDF({orientation:c.width>c.height?'l':'p',unit:'px',format:[c.width,c.height]});pdf.addImage(img,'PNG',0,0,c.width,c.height);pdf.save('suricata-tcp-reassembly.pdf');}); }
+</script>
+</body>
+</html>

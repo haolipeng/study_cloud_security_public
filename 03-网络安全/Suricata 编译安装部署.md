@@ -73,6 +73,14 @@ CFLAGS="-g -O0" ./configure --prefix=/usr  --sysconfdir=/etc --localstatedir=/va
 
 
 
+10.107.19.201机器上编译suricata容器所采用的configure配置
+
+```
+./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --enable-unittests --disable-shared --disable-gccmarch-native --disable-python --disable-suricata-update --disable-libmagic --disable-ja3 --disable-ja4
+```
+
+
+
 ### 3）htp库（可选）
 
 ```shell

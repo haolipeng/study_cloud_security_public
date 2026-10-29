@@ -73,21 +73,11 @@ CFLAGS="-g -O0" ./configure --prefix=/usr  --sysconfdir=/etc --localstatedir=/va
 
 
 
-10.107.19.201机器上编译suricata容器所采用的configure配置
+**10.107.19.201机器上编译suricata容器所采用的configure配置**
 
 ```
-./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --enable-unittests --disable-shared --disable-gccmarch-native --disable-python --disable-suricata-update --disable-libmagic --disable-ja3 --disable-ja4
+./configure --prefix=/usr --sysconfdir=/etc --localstatedir=/var --enable-unittests --disable-shared --disable-gccmarch-native --disable-python --disable-suricata-update
 ```
-
-
-
-### 3）htp库（可选）
-
-```shell
-CFLAGS="-g -O0" ./configure --prefix=/usr  --sysconfdir=/etc --localstatedir=/var  --enable-debug --enable-unittests --enable-non-bundled-htp --with-libhtp-includes=/usr/include --with-libhtp-libraries=/usr/lib
-```
-
-在执行configure命令之前需要配置下PKG_CONFIG_PATH环境变量，让suricata能否寻找到libhtp的位置
 
 
 
